@@ -10,3 +10,14 @@ run/
 .vscode/
 *.hprof
 .DS_Store
+
+# Publish credentials — never commit
+.env
+.env.local
+.env.*.local
+
+# Python venvs / caches (publish scripts)
+.venv/
+venv/
+__pycache__/
+*.pyc
