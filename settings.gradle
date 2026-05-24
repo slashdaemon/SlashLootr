@@ -1,0 +1,19 @@
+pluginManagement {
+    repositories {
+        maven { url "https://maven.fabricmc.net/" }
+        gradlePluginPortal()
+        mavenCentral()
+    }
+}
+
+rootProject.name = "slashlootr"
+
+include "common"
+include "versions:1.21.1"
+include "versions:1.21"
+include "versions:1.21.2"
+include "versions:1.21.4"
+include "versions:1.21.6"
+include "versions:1.21.9"
+include "versions:1.20.5"
+include "versions:1.20.1"

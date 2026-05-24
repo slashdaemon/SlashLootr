@@ -1,0 +1,66 @@
+plugins {
+    id "java"
+    id "fabric-loom" version "1.11-SNAPSHOT" apply false
+}
+
+allprojects {
+    group = project.maven_group
+    version = project.mod_version
+
+    repositories {
+        mavenCentral()
+        maven { url "https://maven.fabricmc.net/" }
+    }
+}
+
+subprojects {
+    apply plugin: "java"
+
+    java {
+        withSourcesJar()
+    }
+
+    tasks.withType(JavaCompile).configureEach {
+        it.options.encoding = "UTF-8"
+    }
+}
+
+project(":common") {
+    tasks.withType(JavaCompile).configureEach {
+        it.options.release = 17
+    }
+    java {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
+}
+
+tasks.register("buildAll") {
+    group = "build"
+    description = "Builds all version band JARs and collects into build/release/"
+    dependsOn ":versions:1.20.1:build"   // Band A: Java 17, ResourceLocation, no RandomizableContainer interface
+    dependsOn ":versions:1.20.5:build"   // Band B: ResourceKey<LootTable>, HolderLookup added
+    dependsOn ":versions:1.21:build"     // Band C: same surface as 1.21.1
+    dependsOn ":versions:1.21.1:build"   // Band C: primary band (TBA target)
+    dependsOn ":versions:1.21.2:build"   // Band D: ContainerEntity.getContainerLootTable rename
+    dependsOn ":versions:1.21.4:build"   // Band D
+    dependsOn ":versions:1.21.6:build"   // Band E: SavedDataType/Codec replaces SavedData.Factory
+    dependsOn ":versions:1.21.9:build"   // Band E
+
+    doLast {
+        def releaseDir = layout.buildDirectory.dir("release").get().asFile
+        releaseDir.deleteDir()
+        releaseDir.mkdirs()
+
+        def bands = ["1.20.1", "1.20.5", "1.21", "1.21.1", "1.21.2", "1.21.4", "1.21.6", "1.21.9"]
+        bands.each { band ->
+            def libsDir = project(":versions:${band}").layout.buildDirectory.dir("libs").get().asFile
+            libsDir.listFiles()?.each { jar ->
+                if (jar.name.endsWith(".jar") && !jar.name.contains("-dev") && !jar.name.contains("-sources")) {
+                    java.nio.file.Files.copy(jar.toPath(), new File(releaseDir, jar.name).toPath())
+                }
+            }
+        }
+        println "Collected ${releaseDir.listFiles()?.length ?: 0} JARs in ${releaseDir.path}"
+    }
+}

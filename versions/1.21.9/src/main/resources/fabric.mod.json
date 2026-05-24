@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "id": "slashlootr",
+  "version": "${version}",
+  "name": "SlashLootr",
+  "description": "Server-side per-player loot for naturally-generated chests, barrels, shulker boxes, chest minecarts, and chest boats. No client install required. No custom blocks. Vanilla-compatible.",
+  "authors": ["Slash"],
+  "contact": {
+    "homepage": "https://github.com/mindfulent/SlashLootr",
+    "sources": "https://github.com/mindfulent/SlashLootr"
+  },
+  "license": "MIT",
+  "environment": "server",
+  "entrypoints": {
+    "main": ["dev.blockacademy.slashlootr.v1_21_1.SlashLootrMod"]
+  },
+  "mixins": ["slashlootr.mixins.json"],
+  "depends": {
+    "fabricloader": ">=0.15.11",
+    "minecraft": "~${minecraft_version}",
+    "java": ">=21",
+    "fabric-api": "*"
+  }
+}

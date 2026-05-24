@@ -1,0 +1,36 @@
+plugins {
+    id "fabric-loom"
+}
+
+version = ""
+
+tasks.withType(JavaCompile).configureEach {
+    it.options.release = 21
+}
+
+base {
+    archivesName = "${rootProject.archives_base_name}-${rootProject.mod_version}+mc${project.minecraft_version}"
+}
+
+dependencies {
+    minecraft "com.mojang:minecraft:${project.minecraft_version}"
+    mappings loom.officialMojangMappings()
+    modImplementation "net.fabricmc:fabric-loader:${project.loader_version}"
+    modImplementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
+
+    implementation project(":common")
+    include project(":common")
+}
+
+// 1.21 shares its sources with 1.21.1 (same API surface within Band D)
+sourceSets.main.java.srcDirs = [project(":versions:1.21.1").file("src/main/java")]
+sourceSets.main.resources.srcDirs = [project(":versions:1.21.1").file("src/main/resources")]
+
+processResources {
+    inputs.property "version", project.mod_version
+    inputs.property "minecraft_version", project.minecraft_version
+
+    filesMatching("fabric.mod.json") {
+        expand "version": project.mod_version, "minecraft_version": project.minecraft_version
+    }
+}
