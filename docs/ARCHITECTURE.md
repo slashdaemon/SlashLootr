@@ -508,6 +508,49 @@ Diff:
 
 **Build**: Loom 1.11.x, Java 21, Fabric API 0.106.1+1.21.2 / 0.114.0+1.21.4.
 
+### Band F — MC 1.21.11
+
+**Why**: at 1.21.11 Mojang shipped a sweeping rename:
+
+- Vehicle subpackage moves: `net.minecraft.world.entity.vehicle.{ChestBoat,MinecartChest,MinecartHopper,AbstractMinecartContainer}` all moved into `{boat,minecart}` subpackages.
+- `ResourceLocation` → `Identifier` (renamed in place under `net.minecraft.resources`).
+- `ResourceKey#location()` → `ResourceKey#identifier()`.
+- `Level#random` is now protected — must use `Level#getRandom()` accessor.
+- `CommandSourceStack#hasPermission(int)` removed; the new pattern is `Commands.hasPermission(Commands.LEVEL_GAMEMASTERS)` as a predicate.
+- `SimpleContainer#addListener` removed entirely — no replacement API. We work around it by subclassing `SimpleContainer` as `DirtyContainer` and overriding `setChanged()` to mark the owning `SavedData` dirty.
+
+**Files that diverge** vs Band E (10 of 12 source files; same shape as Band G's source tree):
+- `mixin/MixinRandomizableContainer.java`, `mixin/MixinContainerEntity.java`: import `Identifier` instead of `ResourceLocation`; `.identifier()` instead of `.location()`.
+- `handler/ContainerInteractionHandler.java`, `handler/EntityInteractionHandler.java`: vehicle class imports moved to subpackages; same rename treatment for the loot-table type.
+- `core/LootRoller.java`: `Identifier` typed loot-table refs; `tableKey.identifier()` for log output.
+- `core/OpenSoundFx.java`: `level.getRandom().nextFloat()` instead of `level.random.nextFloat()`.
+- `config/SlashLootrConfig.java`: blocklist API takes `Identifier`.
+- `command/SlashLootrCommand.java`: `Commands.hasPermission(Commands.LEVEL_GAMEMASTERS)` predicate.
+- `store/SlashLootrState.java`: new inner class `DirtyContainer extends SimpleContainer`; `wrap()` now copies the input into a `DirtyContainer` (since there's no `addListener`); `SavedDataType` first arg still `String` (changes to `Identifier` only in 26.1).
+- `store/PlayerLootEntry.java`: stores the wrapped `DirtyContainer` returned by `owner.wrap(...)` instead of the original input.
+
+**Build**: standard composite subproject — Loom 1.13.6, Java 21, Mojang mappings, Fabric API 0.141.2+1.21.11.
+
+### Band G — MC 26.1.2 ("Tiny Takeover")
+
+**Why**: 26.1.x ships **unobfuscated** — Mojang names are the runtime class names — and requires JDK 25 + Loom 1.15.5 + Gradle 9.4. Loom 1.15.5 conflicts with the main composite's Loom 1.13.6, so this band lives in a **quarantined** sibling Gradle build at `versions/26.1.2/`. The root `build.gradle` shells out to its wrapper via an `Exec` task (`build26`).
+
+**Files that diverge** vs Band F (4 source files):
+- `store/SlashLootrState.java`:
+  - `SavedDataType` first-arg type changed from `String` to `Identifier`. `STATE_ID = Identifier.fromNamespaceAndPath("slashlootr", "slashlootr")`.
+  - Imports `Identifier` (Band F does not).
+- `SeedDeriver.java`: **inlined** into the band's package (`dev.blockacademy.slashlootr.v1_21_1.SeedDeriver`). The quarantine can't reach the main composite's `:common` subproject.
+- `core/LootRoller.java`: import updated to the inlined `SeedDeriver` path.
+- `fabric.mod.json` / `slashlootr.mixins.json`: same content as Band F; carried in the quarantine for self-containment.
+
+**Build infrastructure**:
+- `versions/26.1.2/gradle/wrapper/*` — Gradle 9.4.1 wrapper, cribbed from StreamCraft's 26.1 setup.
+- `versions/26.1.2/settings.gradle` — applies `org.gradle.toolchains.foojay-resolver-convention` so Gradle auto-provisions JDK 25 if not already installed locally.
+- `versions/26.1.2/build.gradle` — Loom 1.15.5, `release = 25`, no `mappings loom.officialMojangMappings()` (26.1 is unobfuscated).
+- Root `build.gradle` adds `tasks.register("build26", Exec)` that runs `versions/26.1.2/gradlew build --no-daemon` and a copy step in `buildAll` that aggregates the quarantined JAR into the shared `build/release/`.
+
+**Build**: quarantined — `cd versions/26.1.2 && ./gradlew build` with `JAVA_HOME` set to a JDK 25 (or let Foojay download one).
+
 ### Band E — MC 1.21.6, 1.21.9
 
 **Why**: between 1.21.4 and 1.21.5/1.21.6, Mojang removed `SavedData.Factory<T>` entirely. The new registration path is:
@@ -574,6 +617,8 @@ Plus the Band D `getContainerLootTable` rename carries through.
 | **C** | 1.21, 1.21.1 | 0 | 2 | 0 | The baseline |
 | **D** | 1.21.2, 1.21.4 | 2 | 2 | 0 | `ContainerEntity` loot-table accessor rename |
 | **E** | 1.21.6, 1.21.9 | 2 | 2 | 0 | `SavedData.Factory` removed → `SavedDataType` + codec |
+| **F** | 1.21.11 | 10 | 2 | 0 | Vehicle subpackage moves; `ResourceLocation`→`Identifier`; `.location()`→`.identifier()`; `Level#random` protected; `Commands.hasPermission` predicate; `SimpleContainer.addListener` removed → `DirtyContainer` subclass |
+| **G** | 26.1.2 | 4 (vs F) | 2 | +1 (inlined `SeedDeriver`) | Quarantined Gradle 9.4 + Loom 1.15.5 + JDK 25; unobfuscated (no Mojang mappings); `SavedDataType` first arg now `Identifier` |
 
 ---
 

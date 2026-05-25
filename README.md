@@ -32,18 +32,20 @@ Full technical comparison and architecture deep-dive: [`docs/ARCHITECTURE.md`](d
 
 ## Supported versions
 
-8 bands, all built via `./gradlew buildAll`. Pick the JAR that matches your server's Minecraft version.
+10 bands, all built via `./gradlew buildAll`. Pick the JAR that matches your server's Minecraft version. Band G (26.1.2) is quarantined — it compiles with its own Gradle 9.4 wrapper + JDK 25 + Loom 1.15.5 because Mojang shipped 26.1 unobfuscated.
 
-| Minecraft | Fabric API     | JAR                                |
-| --------- | -------------- | ---------------------------------- |
-| 1.20.1    | 0.92.2+1.20.1  | `slashlootr-0.1.0+mc1.20.1.jar`    |
-| 1.20.5    | 0.97.8+1.20.5  | `slashlootr-0.1.0+mc1.20.5.jar`    |
-| 1.21      | 0.102.0+1.21   | `slashlootr-0.1.0+mc1.21.jar`      |
-| 1.21.1    | 0.115.6+1.21.1 | `slashlootr-0.1.0+mc1.21.1.jar`    |
-| 1.21.2    | 0.106.1+1.21.2 | `slashlootr-0.1.0+mc1.21.2.jar`    |
-| 1.21.4    | 0.114.0+1.21.4 | `slashlootr-0.1.0+mc1.21.4.jar`    |
-| 1.21.6    | 0.128.1+1.21.6 | `slashlootr-0.1.0+mc1.21.6.jar`    |
-| 1.21.9    | 0.134.1+1.21.9 | `slashlootr-0.1.0+mc1.21.9.jar`    |
+| Minecraft | Fabric API      | JAR                                 |
+| --------- | --------------- | ----------------------------------- |
+| 1.20.1    | 0.92.2+1.20.1   | `slashlootr-0.1.1+mc1.20.1.jar`     |
+| 1.20.5    | 0.97.8+1.20.5   | `slashlootr-0.1.1+mc1.20.5.jar`     |
+| 1.21      | 0.102.0+1.21    | `slashlootr-0.1.1+mc1.21.jar`       |
+| 1.21.1    | 0.115.6+1.21.1  | `slashlootr-0.1.1+mc1.21.1.jar`     |
+| 1.21.2    | 0.106.1+1.21.2  | `slashlootr-0.1.1+mc1.21.2.jar`     |
+| 1.21.4    | 0.114.0+1.21.4  | `slashlootr-0.1.1+mc1.21.4.jar`     |
+| 1.21.6    | 0.128.1+1.21.6  | `slashlootr-0.1.1+mc1.21.6.jar`     |
+| 1.21.9    | 0.134.1+1.21.9  | `slashlootr-0.1.1+mc1.21.9.jar`     |
+| 1.21.11   | 0.141.2+1.21.11 | `slashlootr-0.1.1+mc1.21.11.jar`    |
+| 26.1.2    | 0.146.1+26.1.2  | `slashlootr-0.1.1+mc26.1.2.jar`     |
 
 Each release also ships an exact-version Fabric API requirement — match it.
 

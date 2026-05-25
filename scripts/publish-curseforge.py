@@ -74,10 +74,14 @@ BAND_GAME_VERSIONS = {
     "1.21.2":  ["1.21.2", "1.21.3"],
     "1.21.4":  ["1.21.4", "1.21.5"],
     "1.21.6":  ["1.21.6", "1.21.7", "1.21.8"],
-    "1.21.9":  ["1.21.9", "1.21.10", "1.21.11"],
+    "1.21.9":  ["1.21.9", "1.21.10"],
+    "1.21.11": ["1.21.11"],
+    "26.1.2":  ["26.1.2"],
 }
 
-# Per-band Java version. Band A (1.20.1) needs JDK 17; everything else JDK 21+.
+# Per-band Java version. Band A (1.20.1) needs JDK 17; 1.20.5–1.21.11 use JDK 21.
+# Band G (26.1.2) compiles with JDK 25 but we tag "Java 21" since CF doesn't yet
+# recognize "Java 25" in its catalog (matches StreamCraft's 26.1 convention).
 BAND_JAVA_VERSION = {
     "1.20.1":  "Java 17",
     "1.20.5":  "Java 21",
@@ -87,6 +91,8 @@ BAND_JAVA_VERSION = {
     "1.21.4":  "Java 21",
     "1.21.6":  "Java 21",
     "1.21.9":  "Java 21",
+    "1.21.11": "Java 21",
+    "26.1.2":  "Java 21",
 }
 
 

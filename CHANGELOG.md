@@ -2,6 +2,42 @@
 
 All notable changes to SlashLootr. Dates are YYYY-MM-DD.
 
+## 0.1.1 — 2026-05-25
+
+Two new bands covering Mojang's late-2025 / early-2026 rename storm.
+
+### Added
+
+- **Band F: MC 1.21.11** — picks up the renames Mojang shipped at 1.21.11 that broke Band E on that version:
+  - `net.minecraft.world.entity.vehicle.ChestBoat` → `…vehicle.boat.ChestBoat`
+  - `net.minecraft.world.entity.vehicle.MinecartChest` → `…vehicle.minecart.MinecartChest`
+  - `net.minecraft.world.entity.vehicle.MinecartHopper` → `…vehicle.minecart.MinecartHopper`
+  - `net.minecraft.world.entity.vehicle.AbstractMinecartContainer` → `…vehicle.minecart.AbstractMinecartContainer`
+  - `ResourceLocation` → `Identifier` (renamed in place at `net.minecraft.resources`)
+  - `ResourceKey#location()` → `ResourceKey#identifier()`
+  - `Level#random` (field) → `Level#getRandom()` (method)
+  - `CommandSourceStack#hasPermission(int)` → `Commands.hasPermission(Commands.LEVEL_GAMEMASTERS)` predicate
+  - `SimpleContainer.addListener` removed → replaced with a `DirtyContainer extends SimpleContainer` that overrides `setChanged()` to mark the SavedData dirty
+  - `SavedDataType` first arg still `String` (changes to `Identifier` in 26.1)
+- **Band G: MC 26.1.2 ("Tiny Takeover")** — same rename surface as Band F plus:
+  - **Quarantined**: own Gradle 9.4 wrapper, Loom 1.15.5, JDK 25 toolchain. Lives under `versions/26.1.2/` with its own gradlew. Main composite shells out via the `build26` task.
+  - **Unobfuscated**: no `mappings loom.officialMojangMappings()` — Mojang names ship directly.
+  - `SavedDataType` first arg now `Identifier` (via `Identifier.fromNamespaceAndPath`).
+  - `SeedDeriver` inlined into the band's package since the main composite's `:common` subproject isn't reachable from the quarantine.
+
+### Changed
+
+- **Loom bumped 1.11 → 1.13.6** across the main composite. Verified backwards-compatible with Bands A through E. Required to add 1.21.11 as a regular subproject.
+- **Band E (1.21.9) coverage narrowed** in publish scripts: was claimed to cover 1.21.9–1.21.11; now claims only 1.21.9 and 1.21.10 since 1.21.11 needs Band F's rename surface.
+- **`build.gradle` root**: added `build26` `Exec` task and a quarantined-libs collect step in `buildAll` so the 10 JARs land together in `build/release/`.
+
+### Runtime verified
+
+- Band C (1.21.1): verified with two players on two machines.
+- Bands A, B, D, E, F, G: compile-clean only.
+
+---
+
 ## 0.1.0 — 2026-05-24
 
 Initial implementation. Eight Minecraft version bands shipping out of the gate.

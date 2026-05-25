@@ -1,0 +1,48 @@
+// Quarantined Band F build. Runs under its own Gradle 9.4 wrapper and JDK 25.
+// The parent multi-project build at ../../ shells out to this composite via the
+// `build26` task in the root build.gradle — it does NOT include this composite as a subproject.
+
+plugins {
+    id "java"
+    id "net.fabricmc.fabric-loom" version "1.15.5"
+}
+
+group = project.maven_group
+version = ""
+
+repositories {
+    mavenCentral()
+    maven { url "https://maven.fabricmc.net/" }
+}
+
+java {
+    withSourcesJar()
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(25)
+    }
+}
+
+tasks.withType(JavaCompile).configureEach {
+    it.options.release = 25
+    it.options.encoding = "UTF-8"
+}
+
+base {
+    archivesName = "${project.archives_base_name}-${project.mod_version}+mc${project.minecraft_version}"
+}
+
+dependencies {
+    minecraft "com.mojang:minecraft:${project.minecraft_version}"
+    // No mappings — 26.1 ships unobfuscated.
+    implementation "net.fabricmc:fabric-loader:${project.loader_version}"
+    implementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
+}
+
+processResources {
+    inputs.property "version", project.mod_version
+    inputs.property "minecraft_version", project.minecraft_version
+
+    filesMatching("fabric.mod.json") {
+        expand "version": project.mod_version, "minecraft_version": project.minecraft_version
+    }
+}

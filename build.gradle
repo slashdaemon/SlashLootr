@@ -1,6 +1,6 @@
 plugins {
     id "java"
-    id "fabric-loom" version "1.11-SNAPSHOT" apply false
+    id "fabric-loom" version "1.13.6" apply false
 }
 
 allprojects {
@@ -35,6 +35,23 @@ project(":common") {
     }
 }
 
+// Detect host OS so we can pick gradlew vs gradlew.bat when shelling out to
+// quarantined bands (Band F uses its own Gradle 9.4 wrapper + JDK 25 toolchain).
+def isWindows = System.getProperty("os.name").toLowerCase(java.util.Locale.ROOT).contains("windows")
+
+// Quarantined Band F (MC 26.1.2). Lives in versions/26.1.2/ with its own Gradle 9.4
+// wrapper + Loom 1.15.5 + JDK 25 — incompatible with this composite's Loom 1.11.x
+// so we shell out rather than including it as a subproject.
+tasks.register("build26", Exec) {
+    group = "build"
+    description = "Builds Band F (MC 26.1.x) via its own quarantined wrapper."
+    workingDir = file("versions/26.1.2")
+    def wrapper = file("versions/26.1.2/${isWindows ? 'gradlew.bat' : 'gradlew'}").absolutePath
+    commandLine = isWindows
+            ? ["cmd", "/c", wrapper, "build", "--no-daemon"]
+            : [wrapper, "build", "--no-daemon"]
+}
+
 tasks.register("buildAll") {
     group = "build"
     description = "Builds all version band JARs and collects into build/release/"
@@ -46,13 +63,15 @@ tasks.register("buildAll") {
     dependsOn ":versions:1.21.4:build"   // Band D
     dependsOn ":versions:1.21.6:build"   // Band E: SavedDataType/Codec replaces SavedData.Factory
     dependsOn ":versions:1.21.9:build"   // Band E
+    dependsOn ":versions:1.21.11:build"  // Band F: ChestBoat→boat.ChestBoat, ResourceLocation→Identifier, SimpleContainer.addListener gone
+    dependsOn "build26"                  // Band G: MC 26.1.x (quarantined; JDK 25, Loom 1.15.5, unobfuscated)
 
     doLast {
         def releaseDir = layout.buildDirectory.dir("release").get().asFile
         releaseDir.deleteDir()
         releaseDir.mkdirs()
 
-        def bands = ["1.20.1", "1.20.5", "1.21", "1.21.1", "1.21.2", "1.21.4", "1.21.6", "1.21.9"]
+        def bands = ["1.20.1", "1.20.5", "1.21", "1.21.1", "1.21.2", "1.21.4", "1.21.6", "1.21.9", "1.21.11"]
         bands.each { band ->
             def libsDir = project(":versions:${band}").layout.buildDirectory.dir("libs").get().asFile
             libsDir.listFiles()?.each { jar ->
@@ -61,6 +80,17 @@ tasks.register("buildAll") {
                 }
             }
         }
+
+        // Band F lives outside the composite; its JARs sit in versions/26.1.2/build/libs/.
+        def quarantinedLibs = file("versions/26.1.2/build/libs")
+        quarantinedLibs.listFiles()?.each { jar ->
+            if (jar.name.endsWith(".jar") && !jar.name.contains("-dev") && !jar.name.contains("-sources")) {
+                def dest = new File(releaseDir, jar.name)
+                if (dest.exists()) dest.delete()
+                java.nio.file.Files.copy(jar.toPath(), dest.toPath())
+            }
+        }
+
         println "Collected ${releaseDir.listFiles()?.length ?: 0} JARs in ${releaseDir.path}"
     }
 }
