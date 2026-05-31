@@ -2,6 +2,21 @@
 
 All notable changes to SlashLootr. Dates are YYYY-MM-DD.
 
+## 0.1.2 — 2026-05-31
+
+Branding pass: the project is now published as **SlashLoot** to keep the listing distinct and unambiguous.
+
+### Changed
+
+- **Admin command renamed `/slashlootr` → `/slashloot`** across all bands, to match the new project name.
+- Command feedback messages now prefixed `SlashLoot:` instead of `SlashLootr:`.
+- **License is now CC-BY-4.0** (was MIT) — `LICENSE`, every band's `fabric.mod.json`, and the listing descriptions updated to match.
+- Listing descriptions (Modrinth/CurseForge) and README rewritten to remove third-party-mod comparisons.
+
+### Unchanged (intentionally)
+
+- Mod id, package, config file (`config/slashlootr.json`), and the per-dimension save file (`world/<dim>/data/slashlootr.dat`) keep the `slashlootr` identifier so existing server data is preserved across the update.
+
 ## 0.1.1 — 2026-05-25
 
 Two new bands covering Mojang's late-2025 / early-2026 rename storm.

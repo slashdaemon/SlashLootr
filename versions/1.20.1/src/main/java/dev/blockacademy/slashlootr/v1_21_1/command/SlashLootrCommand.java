@@ -26,7 +26,7 @@ public final class SlashLootrCommand {
     private SlashLootrCommand() {}
 
     public static void register(CommandDispatcher<CommandSourceStack> dispatcher, CommandBuildContext ctx, Commands.CommandSelection env) {
-        dispatcher.register(Commands.literal("slashlootr")
+        dispatcher.register(Commands.literal("slashloot")
                 .requires(src -> src.hasPermission(2))
                 .then(Commands.literal("forget")
                         .then(Commands.literal("here").executes(SlashLootrCommand::forgetHere))
@@ -48,7 +48,7 @@ public final class SlashLootrCommand {
         }
         final BlockPos target = resolved;
         SlashLootrState.get((ServerLevel) sp.level()).forgetBlock(target.asLong());
-        ctx.getSource().sendSuccess(() -> Component.literal("SlashLootr: forgot all player loot at " + posStr(target)), true);
+        ctx.getSource().sendSuccess(() -> Component.literal("SlashLoot: forgot all player loot at " + posStr(target)), true);
         return 1;
     }
 
@@ -56,7 +56,7 @@ public final class SlashLootrCommand {
         BlockPos pos = BlockPosArgument.getBlockPos(ctx, "pos");
         ServerLevel level = ctx.getSource().getLevel();
         SlashLootrState.get(level).forgetBlock(pos.asLong());
-        ctx.getSource().sendSuccess(() -> Component.literal("SlashLootr: forgot all player loot at " + posStr(pos)), true);
+        ctx.getSource().sendSuccess(() -> Component.literal("SlashLoot: forgot all player loot at " + posStr(pos)), true);
         return 1;
     }
 
@@ -67,7 +67,7 @@ public final class SlashLootrCommand {
             SlashLootrState.get(level).forgetPlayerEverywhere(p.getUUID());
         }
         int count = targets.size();
-        ctx.getSource().sendSuccess(() -> Component.literal("SlashLootr: forgot loot for " + count + " player(s) in " + level.dimension().location()), true);
+        ctx.getSource().sendSuccess(() -> Component.literal("SlashLoot: forgot loot for " + count + " player(s) in " + level.dimension().location()), true);
         return targets.size();
     }
 

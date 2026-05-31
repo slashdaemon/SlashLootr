@@ -1,6 +1,6 @@
 # SlashLootr
 
-Server-side per-player loot for naturally-generated containers in Minecraft Fabric. **No client install required. No custom blocks.** A vanilla-compatible alternative to [Lootr](https://modrinth.com/mod/lootr).
+Server-side per-player loot for naturally-generated containers in Minecraft Fabric. **No client install required. No custom blocks.**
 
 ## What it does
 
@@ -8,27 +8,14 @@ Each player who opens a naturally-generated chest, barrel, shulker box, chest mi
 
 Player-placed containers behave exactly as in vanilla.
 
-## Why a new mod when Lootr exists?
+## Why server-side
 
-Lootr (and myLoot) implement per-player loot by **registering custom block variants** and swapping the vanilla block-state at the container's position. This:
+SlashLootr never touches block-state. The container stays a `minecraft:chest` (or barrel, shulker, minecart, etc.) forever, and every player gets their own copy entirely via server-side menu substitution. That means:
 
-- requires the mod on **every client** (mismatched blockstates kick vanilla clients)
-- breaks scoreboard selectors, datapack predicates, structure saves, and other mods that scan for `minecraft:chest`
-- the Lootr authors have [publicly invited](https://modrinth.com/mod/lootr) plugin developers to write a server-only Fabric alternative
+- **No client install.** Players connect with plain vanilla Fabric and never have to update when you do.
+- **Nothing else breaks.** Scoreboard selectors, datapack predicates, `/data` queries, structure saves, and other mods that scan for `minecraft:chest` keep seeing ordinary vanilla blocks.
 
-SlashLootr never touches block-state. The chest stays a `minecraft:chest` forever. Every player gets their own copy entirely via server-side menu substitution.
-
-| Feature                                  | Lootr | myLoot | SlashLootr |
-| ---------------------------------------- | :---: | :----: | :--------: |
-| Per-player loot for naturally-gen chests |  ✓    |   ✓    |     ✓      |
-| Works on dedicated server                |  ✓    |   ✓    |     ✓      |
-| Vanilla clients (no client install)      |  ✗    |   ✗    |     ✓      |
-| Block stays `minecraft:chest`            |  ✗    |   ✗    |     ✓      |
-| Per-player loot for chest minecarts/boats|  ✓    |   ✓    |     ✓      |
-| Looted-state visual (gold→blue)          |  ✓    |   ✓    |     ✗      |
-| Loot decay / re-roll                     |  ✓    |   —    |     ✗      |
-
-Full technical comparison and architecture deep-dive: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
+Architecture deep-dive: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
 ## Supported versions
 
@@ -36,16 +23,16 @@ Full technical comparison and architecture deep-dive: [`docs/ARCHITECTURE.md`](d
 
 | Minecraft | Fabric API      | JAR                                 |
 | --------- | --------------- | ----------------------------------- |
-| 1.20.1    | 0.92.2+1.20.1   | `slashlootr-0.1.1+mc1.20.1.jar`     |
-| 1.20.5    | 0.97.8+1.20.5   | `slashlootr-0.1.1+mc1.20.5.jar`     |
-| 1.21      | 0.102.0+1.21    | `slashlootr-0.1.1+mc1.21.jar`       |
-| 1.21.1    | 0.115.6+1.21.1  | `slashlootr-0.1.1+mc1.21.1.jar`     |
-| 1.21.2    | 0.106.1+1.21.2  | `slashlootr-0.1.1+mc1.21.2.jar`     |
-| 1.21.4    | 0.114.0+1.21.4  | `slashlootr-0.1.1+mc1.21.4.jar`     |
-| 1.21.6    | 0.128.1+1.21.6  | `slashlootr-0.1.1+mc1.21.6.jar`     |
-| 1.21.9    | 0.134.1+1.21.9  | `slashlootr-0.1.1+mc1.21.9.jar`     |
-| 1.21.11   | 0.141.2+1.21.11 | `slashlootr-0.1.1+mc1.21.11.jar`    |
-| 26.1.2    | 0.146.1+26.1.2  | `slashlootr-0.1.1+mc26.1.2.jar`     |
+| 1.20.1    | 0.92.2+1.20.1   | `slashlootr-0.1.2+mc1.20.1.jar`     |
+| 1.20.5    | 0.97.8+1.20.5   | `slashlootr-0.1.2+mc1.20.5.jar`     |
+| 1.21      | 0.102.0+1.21    | `slashlootr-0.1.2+mc1.21.jar`       |
+| 1.21.1    | 0.115.6+1.21.1  | `slashlootr-0.1.2+mc1.21.1.jar`     |
+| 1.21.2    | 0.106.1+1.21.2  | `slashlootr-0.1.2+mc1.21.2.jar`     |
+| 1.21.4    | 0.114.0+1.21.4  | `slashlootr-0.1.2+mc1.21.4.jar`     |
+| 1.21.6    | 0.128.1+1.21.6  | `slashlootr-0.1.2+mc1.21.6.jar`     |
+| 1.21.9    | 0.134.1+1.21.9  | `slashlootr-0.1.2+mc1.21.9.jar`     |
+| 1.21.11   | 0.141.2+1.21.11 | `slashlootr-0.1.2+mc1.21.11.jar`    |
+| 26.1.2    | 0.146.1+26.1.2  | `slashlootr-0.1.2+mc26.1.2.jar`     |
 
 Each release also ships an exact-version Fabric API requirement — match it.
 
@@ -92,18 +79,18 @@ All require permission level 2 (op).
 
 | Command                                  | Effect                                                                  |
 | ---------------------------------------- | ----------------------------------------------------------------------- |
-| `/slashlootr forget here`                | Wipe every player's personal loot at the block you're looking at        |
-| `/slashlootr forget at <x> <y> <z>`      | Same, by coordinate                                                     |
-| `/slashlootr forget player <player>`     | Wipe a player's personal loot at every container in the current dim     |
-| `/slashlootr forget all`                 | (Not yet implemented; stop server and delete `data/slashlootr.dat`)     |
+| `/slashloot forget here`                | Wipe every player's personal loot at the block you're looking at        |
+| `/slashloot forget at <x> <y> <z>`      | Same, by coordinate                                                     |
+| `/slashloot forget player <player>`     | Wipe a player's personal loot at every container in the current dim     |
+| `/slashloot forget all`                 | (Not yet implemented; stop server and delete `data/slashlootr.dat`)     |
 
 ## Known limitations
 
 - **No chest lid animation.** Players hear the open sound but see no lid movement — the per-player menu bypasses vanilla's `ContainerOpenersCounter`. Future work could delegate `startOpen`/`stopOpen` to the underlying chest BE; not blocking for v1.
-- **Hoppers don't pull from naturally-generated chests.** Since vanilla never bakes loot into the chest, hoppers attached to one see an empty container and extract nothing. Matches Lootr's behavior. Player-placed chests are unaffected.
+- **Hoppers don't pull from naturally-generated chests.** Since vanilla never bakes loot into the chest, hoppers attached to one see an empty container and extract nothing. Player-placed chests are unaffected.
 - **Comparator output is always 0** for naturally-generated chests for the same reason. Most map-makers won't care; flag for redstone-heavy worlds.
 - **Decorated pots and suspicious sand/gravel** are not covered. They use a different open mechanic (brushing) — would need separate hooks.
-- **No looted-state visual indicator.** Lootr's gold→blue color change would require a client mod. Out of scope for v1.
+- **No looted-state visual indicator.** A color/texture change to mark already-opened containers would require a client mod. Out of scope for v1.
 
 Rationale for each limitation lives in [`docs/ARCHITECTURE.md` § Limitations and rationale](docs/ARCHITECTURE.md#limitations-and-rationale).
 
@@ -127,10 +114,4 @@ To add a new band, see [`docs/ARCHITECTURE.md` § Adding a new band](docs/ARCHIT
 
 ## License
 
-MIT. See `LICENSE`.
-
-## Acknowledgements
-
-- [Lootr](https://github.com/LootrMinecraft/Lootr) by noobanidus — the original. SlashLootr's hook strategy is informed by reading their `MixinRandomizableContainer`.
-- [myLoot](https://github.com/spoorn/myLoot) by spoorn — Fabric-specific reference for the loot-table-bearing container conversion approach.
-- [LootrPlugin](https://modrinth.com/plugin/lootrplugin) — proves the server-only approach works on Paper.
+[Creative Commons Attribution 4.0 International (CC-BY-4.0)](https://creativecommons.org/licenses/by/4.0/). See `LICENSE`.
