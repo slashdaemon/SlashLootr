@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "slashlootr",
   "version": "${version}",
-  "name": "SlashLootr",
+  "name": "SlashLoot",
   "description": "Server-side per-player loot for naturally-generated chests, barrels, shulker boxes, chest minecarts, and chest boats. No client install required. No custom blocks. Vanilla-compatible.",
   "authors": ["Slash"],
   "contact": {
