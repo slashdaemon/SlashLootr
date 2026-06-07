@@ -86,6 +86,6 @@ All require permission level 2 (op).
 
 ## Source & links
 
-- **GitHub** (source, issues, architecture deep-dive): https://github.com/mindfulent/SlashLootr
-- **Architecture / per-band drift docs**: https://github.com/mindfulent/SlashLootr/blob/main/docs/ARCHITECTURE.md
+- **GitHub** (source, issues, architecture deep-dive): https://github.com/slashdaemon/SlashLootr
+- **Architecture / per-band drift docs**: https://github.com/slashdaemon/SlashLootr/blob/main/docs/ARCHITECTURE.md
 - **License**: CC-BY-4.0

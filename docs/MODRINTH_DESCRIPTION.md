@@ -86,5 +86,5 @@ All require permission level 2 (op).
 
 ## Source & links
 
-- **GitHub** (source, issues, architecture deep-dive): https://github.com/mindfulent/SlashLootr
+- **GitHub** (source, issues, architecture deep-dive): https://github.com/slashdaemon/SlashLootr
 - **License**: CC-BY-4.0

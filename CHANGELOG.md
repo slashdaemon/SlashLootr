@@ -79,7 +79,7 @@ Initial implementation. Eight Minecraft version bands shipping out of the gate.
 - `config/slashlootr.json` with `dimensionBlocklist`, `lootTableBlocklist`, `playOpenCloseSounds`.
 
 **Multi-version build infrastructure**
-- Multi-project Gradle build patterned on `mindfulent/TipSign`. `common/` holds version-agnostic logic (just `SeedDeriver`); each band under `versions/<MC>/` is a self-contained subproject.
+- Multi-project Gradle build patterned on `slashdaemon/TipSign`. `common/` holds version-agnostic logic (just `SeedDeriver`); each band under `versions/<MC>/` is a self-contained subproject.
 - `./gradlew buildAll` produces 8 JARs in `build/release/`.
 
 ### Per-band specifics
@@ -97,7 +97,7 @@ Initial implementation. Eight Minecraft version bands shipping out of the gate.
 ### Build infrastructure
 
 - Loom bumped from 1.9 → 1.10 → 1.11 as needed for newer MC versions.
-- Fabric API versions per band cross-referenced against `mindfulent/TipSign` and Modrinth's Fabric API release list.
+- Fabric API versions per band cross-referenced against `slashdaemon/TipSign` and Modrinth's Fabric API release list.
 
 ### Not yet implemented
 

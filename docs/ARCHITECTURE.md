@@ -701,7 +701,7 @@ Most of the time, a new MC version is a sub-day port. The hard part is identifyi
 
 ### Step-by-step
 
-1. **Find the right Fabric API version** for the target MC release. Cross-reference [`mindfulent/TipSign`](https://github.com/mindfulent/TipSign)'s `versions/` (it ships every MC version we care about) or [modrinth.com/mod/fabric-api/versions](https://modrinth.com/mod/fabric-api/versions).
+1. **Find the right Fabric API version** for the target MC release. Cross-reference [`slashdaemon/TipSign`](https://github.com/slashdaemon/TipSign)'s `versions/` (it ships every MC version we care about) or [modrinth.com/mod/fabric-api/versions](https://modrinth.com/mod/fabric-api/versions).
 2. **Pick the closest baseline band** by API generation: probably one of 1.20.5 / 1.21.1 / 1.21.4 / 1.21.6.
 3. **Create the directory structure**:
    ```bash

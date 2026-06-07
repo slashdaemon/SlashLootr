@@ -6,8 +6,8 @@
   "description": "Server-side per-player loot for naturally-generated chests, barrels, shulker boxes, chest minecarts, and chest boats. No client install required. No custom blocks. Vanilla-compatible.",
   "authors": ["Slash"],
   "contact": {
-    "homepage": "https://github.com/mindfulent/SlashLootr",
-    "sources": "https://github.com/mindfulent/SlashLootr"
+    "homepage": "https://github.com/slashdaemon/SlashLootr",
+    "sources": "https://github.com/slashdaemon/SlashLootr"
   },
   "license": "CC-BY-4.0",
   "environment": "server",
