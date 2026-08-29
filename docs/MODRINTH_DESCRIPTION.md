@@ -17,8 +17,11 @@ SlashLoot runs entirely on the server. Players connect with plain vanilla Fabric
 - **Stable on re-open.** Close the menu with items still inside and they're there next time you open it.
 - **Player-placed containers untouched** — full vanilla behavior for anything you build.
 - **Double-chest support.** Each half tracks per-player loot independently; opening either half shows a combined 54-slot view.
-- **Configurable.** Per-dimension and per-loot-table blocklists for adventure-map compatibility.
-- **Admin commands** to wipe personal loot when you need to.
+- **Vanilla lids, sounds and redstone.** Chest and shulker lids animate, barrels open, and trapped chests still emit redstone.
+- **Configurable.** Per-dimension and per-loot-table blocklists for adventure-map compatibility — blocklisted containers fall back to ordinary vanilla shared loot.
+- **Plays nice with other mods.** Containers SlashLoot doesn't recognise are left entirely to vanilla, and optional debug logging tells you exactly what it decided for each one.
+- **Self-maintaining.** Stored loot is cleaned up when a container is destroyed, so long-running servers don't accumulate dead entries.
+- **Admin commands** to inspect and wipe personal loot when you need to.
 
 ## Container coverage
 
@@ -57,15 +60,30 @@ A `config/slashlootr.json` file is created on first launch:
 
 ```json
 {
+  "enabled": true,
   "dimensionBlocklist": [],
   "lootTableBlocklist": [],
-  "playOpenCloseSounds": true
+  "handleUnknownContainers": false,
+  "delegateContainerAnimation": true,
+  "playOpenCloseSounds": true,
+  "cleanupOnBreak": true,
+  "pruneIntervalTicks": 6000,
+  "pruneBatchSize": 256,
+  "debugLogging": false
 }
 ```
 
-- **`dimensionBlocklist`** — dimensions (e.g. `"minecraft:the_nether"`) where SlashLoot is disabled and vanilla loot behavior applies.
+- **`enabled`** — master switch. `false` makes SlashLoot inert; every container behaves like vanilla.
+- **`dimensionBlocklist`** — dimensions (e.g. `"minecraft:the_nether"`) served as ordinary shared vanilla loot.
 - **`lootTableBlocklist`** — loot tables (e.g. `"minecraft:chests/buried_treasure"`) to skip. Useful for adventure maps with intentionally shared loot.
-- **`playOpenCloseSounds`** — play the chest open sound when the personal menu opens.
+- **`handleUnknownContainers`** — instance modded containers SlashLoot doesn't specifically recognise. Off by default: leaving unknown modded containers to vanilla is the compatible choice.
+- **`delegateContainerAnimation`** — forward open/close to the real container so lids animate, barrels open, and trapped chests emit redstone. Leave on unless a mod conflicts.
+- **`playOpenCloseSounds`** — manual open sound. Only used when `delegateContainerAnimation` is `false` (with delegation on, vanilla plays it).
+- **`cleanupOnBreak`** — drop a container's stored loot when it's destroyed.
+- **`pruneIntervalTicks`** / **`pruneBatchSize`** — background sweep that reclaims entries for containers that no longer exist. `0` disables it.
+- **`debugLogging`** — log one line per container with its position, loot table, and whether SlashLoot instanced it or fell back to vanilla, with the reason. Built for modpack compatibility testing.
+
+Missing keys take their defaults, so a config from an older version keeps working. `/slashloot reload` re-reads the file without a restart.
 
 ## Admin commands
 
@@ -76,12 +94,15 @@ All require permission level 2 (op).
 | `/slashloot forget here`                | Wipe every player's personal loot at the block you're looking at   |
 | `/slashloot forget at <x> <y> <z>`      | Same, by coordinate                                                |
 | `/slashloot forget player <player>`     | Wipe a player's personal loot at every container in the current dim |
+| `/slashloot forget all`                 | Wipe every stored container in the current dimension               |
+| `/slashloot prune`                      | Drop stored entries whose container no longer exists               |
+| `/slashloot stats`                      | Stored entry counts for the current dimension                      |
+| `/slashloot reload`                     | Re-read `config/slashlootr.json`                                   |
 
 ## Known limitations
 
-- **No chest lid animation.** The open sound plays, but the lid stays closed — the per-player menu bypasses vanilla's `ContainerOpenersCounter`.
-- **Hoppers don't pull from naturally-generated chests.** The world container is left "unrolled" by design, so a hopper attached to one sees an empty container. Player-placed chests are unaffected.
-- **Comparator output reads 0** from naturally-generated chests for the same reason.
+- **Hoppers don't pull from instanced containers.** The world container is left "unrolled" by design, so a hopper attached to one sees an empty container. Player-placed containers are unaffected — and so are blocklisted ones, which behave exactly as in vanilla.
+- **Comparator output reads 0** from those same containers, for the same reason.
 - **Decorated pots and suspicious sand/gravel** are not covered — they use a different (brushing) mechanic.
 
 ## Source & links

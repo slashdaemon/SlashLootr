@@ -1,0 +1,14 @@
+{
+  "required": true,
+  "package": "dev.blockacademy.slashlootr.mixin",
+  "compatibilityLevel": "${mixin_compat}",
+  "mixins": [
+    "MixinRandomizableContainer",
+    "MixinContainerEntity",
+    "MixinEntityRemoved"
+  ],
+  "client": [],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

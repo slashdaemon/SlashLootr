@@ -1,0 +1,8 @@
+// Band F - MC 1.21.11
+plugins {
+    id "fabric-loom"
+}
+
+ext.slashloot = [ids: "identifier", vehicle: "moved", store: "codec", open: "containeruser", savedtype: "string"]
+
+apply from: "${rootDir}/gradle/fabric-band.gradle"

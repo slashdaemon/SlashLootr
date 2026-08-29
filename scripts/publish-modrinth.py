@@ -2,9 +2,9 @@
 """
 Publish SlashLootr per-band JARs to Modrinth.
 
-One JAR per MC version band, Fabric-only. Each band becomes one Modrinth
-version. Simplified cousin of StreamCraft's per-platform-variant flow —
-same .env loading, dry-run, project-ID resolution, idempotent re-runs.
+One JAR per (MC version band, loader). Each becomes one Modrinth version,
+tagged with its own loader. Simplified cousin of the StreamCraft per-platform-variant
+flow — same .env loading, dry-run, project-ID resolution, idempotent re-runs.
 
 Usage:
     # Dry-run all bands to inspect metadata
@@ -59,35 +59,39 @@ BAND_GAME_VERSIONS = {
     "26.1.2":  ["26.1.2"],
 }
 
-# Hardcoded dependency: Fabric API (Modrinth project ID P7dR8mSH).
-DEPENDENCIES = [
+# Fabric API (Modrinth project ID P7dR8mSH) is required on Fabric only — the NeoForge
+# builds reach the same events through NeoForge's own bus and depend on nothing extra.
+FABRIC_DEPENDENCIES = [
     {"project_id": "P7dR8mSH", "dependency_type": "required"},  # fabric-api
 ]
 
+LOADERS = ("fabric", "neoforge")
 
-def parse_filename(jar_path: Path) -> tuple[str, str]:
-    """Parse slashlootr-<ver>+mc<band>.jar → (mod_version, mc_band)."""
+
+def parse_filename(jar_path: Path) -> tuple[str, str, str]:
+    """Parse slashlootr-<ver>+mc<band>-<loader>.jar → (mod_version, mc_band, loader)."""
     name = jar_path.stem
-    m = re.match(r"^slashlootr-([^+]+)\+mc([0-9.]+)$", name)
+    m = re.match(r"^slashlootr-([^+]+)\+mc([0-9.]+)-(fabric|neoforge)$", name)
     if not m:
         raise ValueError(f"Cannot parse filename: {jar_path.name}")
-    return m.group(1), m.group(2)
+    return m.group(1), m.group(2), m.group(3)
 
 
-def discover_jars(release_dir: Path, mod_version: str) -> dict[str, Path]:
-    by_band: dict[str, Path] = {}
+def discover_jars(release_dir: Path, mod_version: str) -> dict[tuple[str, str], Path]:
+    """Maps (mc_band, loader) → jar."""
+    found: dict[tuple[str, str], Path] = {}
     for jar in sorted(release_dir.glob(f"slashlootr-{mod_version}+mc*.jar")):
         if jar.name.endswith("-sources.jar") or jar.name.endswith("-dev.jar"):
             continue
         try:
-            ver, band = parse_filename(jar)
+            ver, band, loader = parse_filename(jar)
         except ValueError as e:
             print(f"  skip: {e}")
             continue
         if ver != mod_version:
             continue
-        by_band[band] = jar
-    return by_band
+        found[(band, loader)] = jar
+    return found
 
 
 def extract_changelog(changelog_path: Path, mod_version: str, full_file: bool) -> str:
@@ -146,6 +150,7 @@ def upload_version(
     project_id: str,
     mod_version: str,
     band: str,
+    loader: str,
     jar: Path,
     game_versions: list[str],
     version_type: str,
@@ -154,8 +159,8 @@ def upload_version(
     dry_run: bool,
 ) -> bool:
     """Returns True on successful upload, False on skip."""
-    version_number = f"{mod_version}+mc{band}"
-    name = f"v{mod_version} (MC {band})"
+    version_number = f"{mod_version}+mc{band}-{loader}"
+    name = f"v{mod_version} (MC {band} {loader.capitalize()})"
 
     print(f"\n=== {version_number} ===")
     print(f"  game_versions: {game_versions}")
@@ -171,10 +176,10 @@ def upload_version(
         "name": name,
         "version_number": version_number,
         "changelog": changelog,
-        "dependencies": DEPENDENCIES,
+        "dependencies": FABRIC_DEPENDENCIES if loader == "fabric" else [],
         "game_versions": game_versions,
         "version_type": version_type,
-        "loaders": ["fabric"],
+        "loaders": [loader],
         "featured": False,
         "project_id": project_id,
         "file_parts": [jar.name],
@@ -229,6 +234,7 @@ def main() -> int:
     p.add_argument("--release-dir", default="build/release", help="Directory containing JARs")
     p.add_argument("--changelog-file", default="CHANGELOG.md", help="Path to changelog file")
     p.add_argument("--bands", help="Comma-separated MC bands to upload (default: all discovered)")
+    p.add_argument("--loaders", help="Comma-separated loaders to upload: fabric,neoforge (default: all discovered)")
     p.add_argument("--dry-run", action="store_true", help="Print metadata without uploading")
     args = p.parse_args()
 
@@ -252,19 +258,27 @@ def main() -> int:
         print(f"ERR release dir not found: {release_dir}")
         return 1
 
-    by_band = discover_jars(release_dir, args.version)
-    if not by_band:
+    found = discover_jars(release_dir, args.version)
+    if not found:
         print(f"ERR no JARs found matching version {args.version} in {release_dir}")
         return 1
 
     if args.bands:
         wanted = {b.strip() for b in args.bands.split(",")}
-        by_band = {b: v for b, v in by_band.items() if b in wanted}
-        if not by_band:
+        found = {k: v for k, v in found.items() if k[0] in wanted}
+        if not found:
             print(f"ERR no bands matching --bands={args.bands}")
             return 1
 
-    print(f"Discovered {len(by_band)} band(s) for v{args.version}: {sorted(by_band)}")
+    if args.loaders:
+        wanted_loaders = {l.strip().lower() for l in args.loaders.split(",")}
+        found = {k: v for k, v in found.items() if k[1] in wanted_loaders}
+        if not found:
+            print(f"ERR no files matching --loaders={args.loaders}")
+            return 1
+
+    print(f"Discovered {len(found)} file(s) for v{args.version}: "
+          f"{[f'{b}-{l}' for b, l in sorted(found)]}")
 
     full_file = (args.changelog_file != "CHANGELOG.md")
     changelog = extract_changelog(project_root / args.changelog_file, args.version, full_file)
@@ -280,7 +294,7 @@ def main() -> int:
         print(f"Project: {args.project} -> id={project_id}")
         try:
             known = fetch_known_game_versions()
-            seen = {b for b in by_band}
+            seen = {band for band, _ in found}
             for band in seen:
                 requested = BAND_GAME_VERSIONS.get(band, [band])
                 missing = [v for v in requested if v not in known]
@@ -292,8 +306,8 @@ def main() -> int:
 
     failures = 0
     successes = 0
-    for band in sorted(by_band):
-        jar = by_band[band]
+    for band, loader in sorted(found):
+        jar = found[(band, loader)]
         game_versions = BAND_GAME_VERSIONS.get(band, [band])
         try:
             if upload_version(
@@ -301,6 +315,7 @@ def main() -> int:
                 project_id=project_id,
                 mod_version=args.version,
                 band=band,
+                loader=loader,
                 jar=jar,
                 game_versions=game_versions,
                 version_type=args.type,
@@ -313,7 +328,7 @@ def main() -> int:
             print(f"  FAILED: {e}")
             failures += 1
 
-    skipped = len(by_band) - successes - failures
+    skipped = len(found) - successes - failures
     print(f"\nDone - {successes} uploaded, {failures} failed, {skipped} skipped")
     return 1 if failures else 0
 

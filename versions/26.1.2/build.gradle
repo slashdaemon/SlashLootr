@@ -1,6 +1,9 @@
-// Quarantined Band F build. Runs under its own Gradle 9.4 wrapper and JDK 25.
-// The parent multi-project build at ../../ shells out to this composite via the
-// `build26` task in the root build.gradle — it does NOT include this composite as a subproject.
+// Quarantined Band G build (MC 26.1.x). Runs under its own Gradle 9.4 wrapper and JDK 25 because
+// Loom 1.15.5 is incompatible with the parent composite's Loom 1.13.6. The parent shells out to
+// this build via its `build26` task; it is NOT included as a subproject.
+//
+// It still compiles the SAME shared source tree as every other band — mc-src/ plus the compat
+// variants — reached by relative path since the parent's project model is not visible here.
 
 plugins {
     id "java"
@@ -28,7 +31,7 @@ tasks.withType(JavaCompile).configureEach {
 }
 
 base {
-    archivesName = "${project.archives_base_name}-${project.mod_version}+mc${project.minecraft_version}"
+    archivesName = "${project.archives_base_name}-${project.mod_version}+mc${project.minecraft_version}-fabric"
 }
 
 dependencies {
@@ -38,11 +41,39 @@ dependencies {
     implementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
 }
 
+// --- shared source composition (mirrors gradle/fabric-band.gradle) ---------------------------
+// Band G variants: ids=identifier, vehicle=moved, store=codec, savedtype=id, open=containeruser.
+def repoRoot = file("../..")
+[
+        "common/src/main/java",
+        "mc-src/src/main/java",
+        "compat/ids-identifier/src/main/java",
+        "compat/vehicle-moved/src/main/java",
+        "compat/store-codec/src/main/java",
+        "compat/savedtype-id/src/main/java",
+        "compat/open-containeruser/src/main/java",
+        "loader-fabric/src/main/java",
+].each { rel -> sourceSets.main.java.srcDirs += new File(repoRoot, rel) }
+sourceSets.main.resources.srcDirs += new File(repoRoot, "loader-fabric/src/main/resources")
+
 processResources {
     inputs.property "version", project.mod_version
     inputs.property "minecraft_version", project.minecraft_version
+    inputs.property "java_version", project.java_version
+    inputs.property "mixin_compat", project.mixin_compat
 
     filesMatching("fabric.mod.json") {
-        expand "version": project.mod_version, "minecraft_version": project.minecraft_version
+        expand "version": project.mod_version,
+                "minecraft_version": project.minecraft_version,
+                "java_version": project.java_version
+    }
+    filesMatching("slashlootr.mixins.json") {
+        expand "mixin_compat": project.mixin_compat
+    }
+}
+
+jar {
+    from("${repoRoot}/LICENSE") {
+        rename { "${it}_slashlootr" }
     }
 }

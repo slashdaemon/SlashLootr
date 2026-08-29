@@ -1,118 +1,169 @@
 # CLAUDE.md — SlashLootr
 
-Server-side per-player loot mod for Fabric. **No custom blocks.** **No client install required.** Vanilla-compatible alternative to [Lootr](https://github.com/LootrMinecraft/Lootr).
+Server-side per-player loot mod, published as **SlashLoot**. **No custom blocks.** **No client install required.** Vanilla-compatible alternative to [Lootr](https://github.com/LootrMinecraft/Lootr).
 
 ## Why this exists
 
-Lootr/myLoot achieve per-player chests by swapping vanilla blocks for custom `LootrChestBlock`/`MyLootChestBlock` variants. That breaks vanilla compatibility and requires clients to install the mod. SlashLootr does the same job by intercepting two vanilla code paths server-side — the chest stays a `minecraft:chest` and vanilla clients connect normally.
+Lootr/myLoot achieve per-player chests by swapping vanilla blocks for custom `LootrChestBlock`/`MyLootChestBlock` variants. That breaks vanilla compatibility and requires clients to install the mod. SlashLoot does the same job by intercepting two vanilla code paths server-side — the chest stays a `minecraft:chest` and vanilla clients connect normally.
 
 ## How it works
 
 1. **Mixin** `RandomizableContainer#unpackLootTable` (and `ContainerEntity#unpackChestVehicleLootTable`) → cancel the vanilla loot roll. The chest's `LootTable`/`LootTableSeed` NBT tags persist forever; the world container stays "unrolled."
-2. **Fabric `UseBlockCallback`/`UseEntityCallback`** → on player right-click, look up or roll a personal `SimpleContainer` from a per-dimension `SavedData`, then `player.openMenu(...)` a vanilla `ChestMenu` backed by that personal container.
+2. **Loader event on player right-click** → look up or roll a personal container from a per-dimension `SavedData`, then `openMenu(...)` a vanilla `ChestMenu` backed by it.
 
 Per-player seed: `XOR(containerSeed, player.uuid.msb, rotL(player.uuid.lsb, 17))` — deterministic, so re-opening shows what you left.
 
 Persistence: `world/<dim>/data/slashlootr.dat`. Two maps inside: `blocks` (keyed by packed `BlockPos`) and `entities` (keyed by entity UUID).
 
+### `core/Handling` is the single decision point
+
+**Both the mixins and the interaction handlers ask `Handling` and nothing else** whether a container
+is ours. That is not a style choice — it is the fix for the two worst bugs in 0.1.x, where the mixin
+cancelled the vanilla roll for containers the handlers then refused to serve, leaving them
+permanently empty. A `VANILLA` verdict means the mixin does not cancel and the container behaves as
+if SlashLoot were absent.
+
+**If you add a new container type or a new skip condition, it goes in `Handling`.** Never add a
+condition to a handler or a mixin alone.
+
+`Handling` runs from `unpackLootTable`, which hopper polling reaches repeatedly, so it must stay
+side-effect free and must never force-load a chunk.
+
 ## Build
 
-Java 21 required for all currently-shipped bands.
+Java 21 for bands A–F (Java 17 target for Band A); Band G (26.1.x) needs JDK 25 via its own wrapper.
 
 ```bash
 export JAVA_HOME="/c/Users/slash/AppData/Roaming/PrismLauncher/java/java-runtime-delta"
 export PATH="$JAVA_HOME/bin:$PATH"
-./gradlew buildAll            # all bands → build/release/
-./gradlew :versions:1.21.1:build   # single band
+./gradlew buildAll                      # all bands → build/release/
+./gradlew :versions:1.21.1-fabric:build # single band
+./gradlew build26                       # quarantined Band G only
 ```
 
 Verify Prism's JDK still aliases as `java-runtime-delta` (Prism rotates these — check `ls ~/AppData/Roaming/PrismLauncher/java/` if Gradle complains about the toolchain).
 
 ## Layout
 
+One shared source tree, composed per band. **There are no per-band copies of the mod logic** —
+a fix is written once.
+
 ```
 SlashLootr/
-├── common/                  # pure Java 17, version-agnostic
-│   └── src/main/java/dev/blockacademy/slashlootr/common/SeedDeriver.java
-├── versions/
-│   ├── 1.21.1/              # primary band (TBA target), full source lives here
-│   │   ├── build.gradle
-│   │   ├── gradle.properties
-│   │   └── src/main/
-│   │       ├── java/dev/blockacademy/slashlootr/v1_21_1/
-│   │       │   ├── SlashLootrMod.java
-│   │       │   ├── mixin/MixinRandomizableContainer.java
-│   │       │   ├── mixin/MixinContainerEntity.java
-│   │       │   ├── handler/ContainerInteractionHandler.java     # UseBlockCallback
-│   │       │   ├── handler/EntityInteractionHandler.java        # UseEntityCallback
-│   │       │   ├── store/SlashLootrState.java                   # PersistentState/SavedData
-│   │       │   ├── store/PlayerLootEntry.java
-│   │       │   ├── core/LootRoller.java                         # LootTable#fill wrapper
-│   │       │   ├── core/ContainerKind.java                      # menu type + slot count
-│   │       │   ├── core/OpenSoundFx.java                        # plays open sound
-│   │       │   ├── command/SlashLootrCommand.java               # /slashlootr forget ...
-│   │       │   └── config/SlashLootrConfig.java                 # config/slashlootr.json
-│   │       └── resources/
-│   │           ├── fabric.mod.json
-│   │           └── slashlootr.mixins.json
-│   └── 1.21/                # symlink-via-Gradle to 1.21.1's sources (compatible API)
+├── common/                     SeedDeriver — plain Java, no MC types
+├── mc-src/                     ALL shared mod logic, ONE copy (bands B–G)
+│   └── src/main/java/dev/blockacademy/slashlootr/
+│       ├── SlashLootrCore.java         boot(LoaderBridge)
+│       ├── loader/LoaderBridge.java    the ONLY Fabric/NeoForge seam
+│       ├── core/Handling.java          THE decision function (read this first)
+│       ├── core/LootContainerBase.java dirty tracking + open/close delegation
+│       ├── core/{ContainerKind,LootRoller,OpenSoundFx,DebugLog}.java
+│       ├── handler/{ContainerInteraction,EntityInteraction,Cleanup}Handler.java
+│       ├── command/SlashLootCommand.java
+│       ├── config/SlashLootrConfig.java
+│       ├── store/PlayerLootEntry.java
+│       └── mixin/{MixinRandomizableContainer,MixinContainerEntity,MixinEntityRemoved}.java
+├── compat/                     per-generation seams, a few dozen lines each
+│   ├── ids-location/           B–E   ResourceKey#location(), hasPermission(2)
+│   ├── ids-identifier/         F–G   ResourceKey#identifier(), Commands.hasPermission
+│   ├── vehicle-legacy/         B–C   ContainerEntity#getLootTable
+│   ├── vehicle-container/      D–E   #getContainerLootTable
+│   ├── vehicle-moved/          F–G   + vehicle.minecart / vehicle.boat packages
+│   ├── store-nbt/              B–D   SavedData.Factory + CompoundTag
+│   ├── store-codec/            E–G   SavedDataType + Codec
+│   ├── savedtype-string/       E–F   SavedDataType(String, …)
+│   ├── savedtype-id/           G     SavedDataType(Identifier, …)
+│   ├── open-player/            B–E   Container#startOpen(Player)
+│   └── open-containeruser/     F–G   Container#startOpen(ContainerUser)
+├── loader-fabric/              FabricBridge + entrypoint + fabric.mod.json + mixins.json
+├── gradle/fabric-band.gradle   composes the above from each band's variant list
+└── versions/
+    ├── 1.20.1-fabric/          Band A — SELF-CONTAINED FORK (see below)
+    ├── <band>-fabric/          build.gradle + gradle.properties only
+    └── 26.1.2/                 Band G — quarantined composite (own wrapper, JDK 25)
 ```
+
+A band's whole build file is its variant list:
+
+```gradle
+plugins { id "fabric-loom" }
+ext.slashloot = [ids: "location", vehicle: "legacy", store: "nbt", open: "player"]
+apply from: "${rootDir}/gradle/fabric-band.gradle"
+```
+
+### Band A is deliberately a fork
+
+`versions/1.20.1-fabric/` keeps its own full copy of the sources. MC 1.20.1 predates the
+`RandomizableContainer` and `ContainerEntity` interfaces, stores loot tables as `ResourceLocation`
+rather than `ResourceKey<LootTable>`, and keeps those fields private (hence the `@Accessor` mixins).
+Sharing it would mean an opaque loot-reference abstraction across every band to serve one legacy
+Fabric-only version. **Changes to `mc-src` must be ported to Band A by hand** — its `Handling` keeps
+the same contract and the same reason strings, so the port is mechanical.
 
 ## Currently shipping
 
-8 bands, all built via `./gradlew buildAll`:
+10 JARs, all via `./gradlew buildAll`. Artifacts are `slashlootr-<ver>+mc<band>-<loader>.jar`.
 
-| Band | MC | Notes |
-| ---- | -- | ----- |
-| A | 1.20.1 | Java 17. `RandomizableContainerBlockEntity` class target; no `ContainerEntity` interface — separate mixins on `AbstractMinecartContainer`/`ChestBoat`. `ResourceLocation` (not `ResourceKey<LootTable>`). Private loot-table fields accessed via `@Accessor` mixins. `SavedData.computeIfAbsent` 3-arg form, `save(CompoundTag)` without `HolderLookup.Provider`. |
-| B | 1.20.5 | `RandomizableContainer`/`ContainerEntity` interfaces. `ResourceKey<LootTable>`. `HolderLookup.Provider` added. |
-| C | 1.21, 1.21.1 | Same surface as 1.20.5. 1.21 shares sources with 1.21.1 via `sourceSets.main.java.srcDirs`. |
-| D | 1.21.2, 1.21.4 | `ContainerEntity.getLootTable()` → `getContainerLootTable()`. Otherwise same as Band C. |
-| E | 1.21.6, 1.21.9 | `SavedData.Factory` removed; `SavedDataType<T>` + `Codec<T>` only. `SlashLootrState` rewritten with `RecordCodecBuilder`. Needs Loom 1.10+ (1.21.6) / 1.11+ (1.21.9). |
+| Band | MC | ids | vehicle | store | savedtype | open |
+| ---- | -- | --- | ------- | ----- | --------- | ---- |
+| A | 1.20.1 | *(fork — Java 17)* | | | | |
+| B | 1.20.5–1.20.6 | location | legacy | nbt | — | player |
+| C | 1.21, 1.21.1 | location | legacy | nbt | — | player |
+| D | 1.21.2, 1.21.4 | location | container | nbt | — | player |
+| E | 1.21.6 | location | container | codec | string | player |
+| E | 1.21.9 | location | container | codec | string | containeruser |
+| F | 1.21.11 | identifier | moved | codec | string | containeruser |
+| G | 26.1.2 | identifier | moved | codec | id | containeruser |
+
+Where each split lands: `getContainerLootTable` at **1.21.2**; `SavedDataType`+`Codec` at **1.21.6**;
+`startOpen(ContainerUser)` at **1.21.9**; `Identifier` + vehicle package move at **1.21.11**;
+`SavedDataType(Identifier)` at **26.1**.
 
 ## Adding a new band
 
-1. **Cheap path**: if the target shares a baseline band's API surface, mirror that band's `build.gradle`. For 1.21+ this means just `dependencies`/`processResources` + `sourceSets.main.java.srcDirs = [project(":versions:<baseline>").file("src/main/java")]` if compatible. Update `gradle.properties` with the right `minecraft_version`/`fabric_api_version` (cross-reference TipSign's `versions/` for known-good fabric-api releases per MC version, or modrinth.com/mod/fabric-api/versions).
-2. **If it doesn't compile**: copy the closest-baseline band's full `src/main/` tree to `versions/<NEW>/src/main/` and adapt only what the compiler flags. Known drift to watch for is summarized in the table above.
-3. Add the band to `settings.gradle` and to `buildAll`'s `dependsOn` + `bands` list in root `build.gradle`.
-4. Loom version: 1.10+ for 1.21.6+, 1.11+ for 1.21.9+. Bump in root `build.gradle` if needed.
+1. `include "versions:<MC>-fabric"` in `settings.gradle` and add it to `fabricBands` in the root `build.gradle`.
+2. Create `versions/<MC>-fabric/gradle.properties` (`minecraft_version`, `fabric_api_version`; add `java_version` / `mixin_compat` only if it is not JDK 21).
+3. Create `versions/<MC>-fabric/build.gradle` with the four-key variant list above — pick the row from the table whose splits the new version is on.
+4. Build. **If it compiles, you are done.** If it does not, the compiler is telling you a new drift axis appeared: add a `compat/<axis>-<variant>/` directory holding only the differing calls, add the key to `gradle/fabric-band.gradle`, and set it on every band. Do not fork the whole tree.
 
-## Verification (manual, LocalServer)
+## Verification
 
-LocalServer (`C:\Users\slash\Projects\LocalServer\`) is the test rig. Mirrors prod deploy via mrpack4server.
+**Build gate:** `./gradlew buildAll` must collect the expected JAR count into `build/release/`.
 
-```bash
-# 1. Build
-./gradlew :versions:1.21.1:build
+**Headless functional pass** (no client needed — a hopper under a container triggers
+`unpackLootTable`, which is the exact path the mixins hook). Boot a bare Fabric server with the
+band's JAR + Fabric API, then over RCON:
 
-# 2. Deploy to LocalServer
-cp versions/1.21.1/build/libs/slashlootr-0.1.0+mc1.21.1.jar /c/Users/slash/Projects/LocalServer/mods/
-
-# 3. Start in fresh mode
-cd /c/Users/slash/Projects/LocalServer && python server-config.py
-# pick "fresh" mode → "start"
+```
+setblock <p> minecraft:chest{LootTable:"minecraft:chests/simple_dungeon",LootTableSeed:1L}
+setblock <p below> minecraft:hopper[facing=down]
+data get block <p>          # instanced: LootTable tag SURVIVES, hopper stays empty
+                            # blacklisted/unsupported: tag GONE, hopper holds real vanilla loot
 ```
 
-End-to-end test (two players required):
+Cover: chest (instanced), chest with its table in `lootTableBlocklist` (must fall back to vanilla),
+`minecraft:hopper` with a loot table (unsupported container — must fall back to vanilla), barrel,
+chest minecart. Set `debugLogging: true` and check each verdict line reads correctly.
 
-1. `/locate structure minecraft:mineshaft` → tp to result → dig to find a chest
-2. Verify it's naturally-generated: `/data get block ~ ~ ~ LootTable` → should show a loot table ID
-3. Player A opens it → notes the items
-4. Player B opens it → should be **different items**
-5. Player A closes, re-opens → same items as step 3
-6. `/stop` then restart → both players' loot persists across the boot
-7. `/data get block ~ ~ ~ LootTable` on the same chest → **the loot table tag is still there** (proves we never let vanilla bake)
-8. Place a player-crafted chest, drop items in, re-open → still shows your dropped items (no interception for player-placed)
+**Client pass** (needs two players; LocalServer at `C:\Users\slash\Projects\LocalServer\`):
 
-Repeat for: trapped chest (jungle temple), barrel (village), shulker box (ancient city), chest minecart (mineshaft cart on rails), double chest (stronghold library), chest boat (buried treasure ocean ruins).
+1. `/locate structure minecraft:mineshaft` → dig to a chest → `/data get block ~ ~ ~ LootTable` shows a table id
+2. Player A opens it → notes items; Player B opens → **different items**; A re-opens → same as before
+3. Restart the server → both players' loot persists; the `LootTable` tag is still on the block
+4. Lid animates on open, and the open sound plays **once**
+5. Redstone lamp beside a natural **trapped** chest powers while open
+6. Break the chest → `/slashloot stats` block count drops by one
+7. Place a player-crafted chest → no interception
 
-## Known limitations (v1)
+Repeat for: trapped chest, barrel, shulker box, chest minecart, double chest (both lids), chest boat.
 
-- **No chest lid animation.** Open sound plays via `OpenSoundFx`, but lid stays closed (we bypass `ContainerOpenersCounter`). Would need either delegating `startOpen`/`stopOpen` to the underlying chest BE or sending block events manually.
-- **Hoppers extract nothing** from naturally-generated chests (world container is always empty). Matches Lootr behavior. Document for players.
-- **Comparator output reads 0** from naturally-generated chests for the same reason.
-- **No decay / re-roll** — per-player loot is permanent. User chose this in plan.
+## Known limitations
+
+- **Hoppers extract nothing** from naturally-generated containers SlashLoot instances (the world container is always empty). Matches Lootr. Blacklisted and unsupported containers are unaffected.
+- **Comparator output reads 0** from those same containers, for the same reason.
+- **No decay / re-roll** — per-player loot is permanent by design.
+- **Prune skips unloaded chunks.** Entries for containers destroyed in chunks that never load again are not reclaimed; they are cheap and get dropped on the next pass that finds the chunk loaded.
 
 ## Repository
 
-Not yet pushed. Per project CLAUDE.md collaboration rules: no `Co-Authored-By: Claude` trailer on commits. Don't deploy to TBA without explicit approval (mod isn't even there yet — it doesn't go in the modpack, it goes in `server-config.py update-pack` as a server-side-only addon).
+`slashdaemon/SlashLootr`. No `Co-Authored-By: Claude` trailer on commits. Not part of the TBA modpack — it is a server-side-only addon.

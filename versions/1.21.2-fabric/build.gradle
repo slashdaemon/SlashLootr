@@ -1,0 +1,8 @@
+// Band D - MC 1.21.2/1.21.3
+plugins {
+    id "fabric-loom"
+}
+
+ext.slashloot = [ids: "location", vehicle: "container", store: "nbt", open: "player"]
+
+apply from: "${rootDir}/gradle/fabric-band.gradle"

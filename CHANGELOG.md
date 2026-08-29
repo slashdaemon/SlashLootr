@@ -2,6 +2,72 @@
 
 All notable changes to SlashLootr. Dates are YYYY-MM-DD.
 
+## 0.2.0 — 2026-08-29
+
+Compatibility release, driven by modpack-author feedback on the CurseForge page.
+
+### Fixed
+
+- **Blacklisted dimensions and loot tables served empty containers.** The loot-cancelling mixins
+  cancelled the vanilla roll unconditionally while the interaction handlers skipped anything
+  blacklisted, so a blacklisted container was never rolled by anyone. Both sides now ask the same
+  question through a single decision function (`core/Handling`), and a "vanilla" verdict means the
+  container behaves exactly as if SlashLoot were not installed — including hopper extraction and
+  comparator output.
+- **Unknown modded containers were broken the same way.** `unpackLootTable` is a default method on
+  the `RandomizableContainer` interface, so the mixin fired for every implementor in the game,
+  including containers SlashLoot has no idea how to serve. Anything not actually instanced is now
+  left completely alone. Opt in with `handleUnknownContainers`.
+- **Container slot count is read from the world container** instead of assuming 27, so a modded
+  chest with a different inventory size is no longer silently truncated.
+- **`/slashloot forget all` works.** It previously printed an instruction to stop the server and
+  delete the `.dat` file by hand.
+
+### Added
+
+- **Chest lids animate again.** Personal containers delegate `startOpen`/`stopOpen` to the real
+  world container, so vanilla's `ContainerOpenersCounter` runs: chest and shulker lids animate,
+  barrels flip their `open` blockstate, and **trapped chests emit redstone**. Both halves of a
+  double chest animate. Controlled by `delegateContainerAnimation` (default on); with it on, the
+  manual open sound is suppressed so the sound does not play twice.
+- **Stored loot is cleaned up when a container is destroyed**, in three layers: the player-break
+  event, a loader-neutral mixin on entity removal (filtered on `RemovalReason#shouldDestroy` so a
+  chunk unload never wipes a chest minecart), and a background prune that re-checks stored
+  positions in loaded chunks to catch explosions, pistons, and world edits.
+  Config: `cleanupOnBreak`, `pruneIntervalTicks`, `pruneBatchSize`.
+- **Optional decision logging** (`debugLogging`). One line per container giving position, loot
+  table, verdict, and reason (`dimension_blocklisted`, `unsupported_container:<id>`, …). Emitted
+  from the decision function itself, so it always reflects what actually happened. Repeat verdicts
+  for the same container are deduplicated so hopper polling cannot flood the log.
+- **New commands:** `/slashloot prune`, `/slashloot stats`, `/slashloot reload`.
+- **New config keys:** `enabled`, `handleUnknownContainers`, `delegateContainerAnimation`,
+  `cleanupOnBreak`, `pruneIntervalTicks`, `pruneBatchSize`, `debugLogging`. Missing keys take
+  their defaults, so a 0.1.x config keeps working.
+
+### Changed
+
+- **JARs are now named `slashlootr-<version>+mc<band>-fabric.jar`.** The loader suffix makes room
+  for the NeoForge builds landing in 0.3.0.
+- **Band G (26.1.2) mixin config now declares `JAVA_25`**, matching the JDK it is compiled with.
+  It was shipping `JAVA_21`.
+
+### Internal
+
+- **The nine per-band source forks are gone.** All bands from 1.20.5 up compile one shared tree
+  (`mc-src/`) plus small per-generation compat variants (`compat/ids-*`, `vehicle-*`, `store-*`,
+  `savedtype-*`, `open-*`) and a loader adapter (`loader-fabric/`). A fix is written once instead
+  of nine times. Band A (1.20.1) remains a self-contained fork — it predates the
+  `RandomizableContainer` interface and `ResourceKey<LootTable>` — and carries the same fixes.
+- Mod id, `config/slashlootr.json`, and `world/<dim>/data/slashlootr.dat` are unchanged, so
+  existing server data carries over untouched.
+
+### Runtime verified
+
+- Band C (1.21.1): blacklist fallback, unknown-container fallback, and decision logging verified
+  end-to-end on a headless server for chests, barrels, hoppers-with-loot-tables, and chest
+  minecarts. Commands and config reload exercised over RCON. No mixin warnings on boot.
+- Bands A, B, D, E, F, G: compile-clean.
+
 ## 0.1.2 — 2026-05-31
 
 Branding pass: the project is now published as **SlashLoot** to keep the listing distinct and unambiguous.

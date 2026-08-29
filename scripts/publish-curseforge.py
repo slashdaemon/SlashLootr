@@ -2,7 +2,7 @@
 """
 Publish SlashLootr per-band JARs to CurseForge.
 
-SlashLootr ships one JAR per MC version band — no platform variants, Fabric only.
+SlashLootr ships one JAR per (MC version band, loader) — no platform variants.
 Each (band) becomes one CurseForge file. This is the simplified cousin of
 StreamCraft's per-platform-variant flow: same project ID resolution, same
 game-version catalog handling, same dry-run + selective-bands ergonomics —
@@ -96,33 +96,33 @@ BAND_JAVA_VERSION = {
 }
 
 
-def parse_filename(jar_path: Path) -> tuple[str, str]:
+def parse_filename(jar_path: Path) -> tuple[str, str, str]:
     """
-    Parse a JAR filename into (mod_version, mc_band).
-    Expected shape: slashlootr-<ver>+mc<band>.jar
+    Parse a JAR filename into (mod_version, mc_band, loader).
+    Expected shape: slashlootr-<ver>+mc<band>-<loader>.jar
     """
     name = jar_path.stem
-    m = re.match(r"^slashlootr-([^+]+)\+mc([0-9.]+)$", name)
+    m = re.match(r"^slashlootr-([^+]+)\+mc([0-9.]+)-(fabric|neoforge)$", name)
     if not m:
         raise ValueError(f"Cannot parse filename: {jar_path.name}")
-    return m.group(1), m.group(2)
+    return m.group(1), m.group(2), m.group(3)
 
 
-def discover_jars(release_dir: Path, mod_version: str) -> dict[str, Path]:
-    """Return {mc_band: jar_path} for the given mod version."""
-    by_band: dict[str, Path] = {}
+def discover_jars(release_dir: Path, mod_version: str) -> dict[tuple[str, str], Path]:
+    """Return {(mc_band, loader): jar_path} for the given mod version."""
+    found: dict[tuple[str, str], Path] = {}
     for jar in sorted(release_dir.glob(f"slashlootr-{mod_version}+mc*.jar")):
         if jar.name.endswith("-sources.jar") or jar.name.endswith("-dev.jar"):
             continue
         try:
-            ver, band = parse_filename(jar)
+            ver, band, loader = parse_filename(jar)
         except ValueError as e:
             print(f"  skip: {e}")
             continue
         if ver != mod_version:
             continue
-        by_band[band] = jar
-    return by_band
+        found[(band, loader)] = jar
+    return found
 
 
 def extract_changelog(changelog_path: Path, mod_version: str, full_file: bool) -> str:
@@ -190,9 +190,10 @@ def expected_type_slug(name: str) -> str | None:
       "1.21.1"  -> "minecraft-1-21"
       "1.20.5"  -> "minecraft-1-20"
       "Fabric"  -> "modloader"
+      "NeoForge"-> "modloader"
       "Java 21" -> "java"
     """
-    if name == "Fabric":
+    if name in ("Fabric", "NeoForge"):
         return "modloader"
     if name.startswith("Java "):
         return "java"
@@ -209,9 +210,10 @@ def resolve_game_version_ids(
     mc_versions: list[str],
     java_version: str,
     band: str,
+    loader_name: str,
 ) -> list[int]:
     """Build the gameVersions int-ID array CurseForge expects."""
-    requested = [*mc_versions, "Fabric", java_version]
+    requested = [*mc_versions, loader_name, java_version]
     ids: list[int] = []
     missing: list[str] = []
     for name in requested:
@@ -263,6 +265,7 @@ def upload_band(
     project_id: int,
     mod_version: str,
     band: str,
+    loader: str,
     jar: Path,
     game_version_ids: list[int],
     release_type: str,
@@ -271,13 +274,13 @@ def upload_band(
     token: str,
     dry_run: bool,
 ) -> bool:
-    """Upload one band's JAR. Returns True on success, False on dry-run."""
-    print(f"\n=== {mod_version}+mc{band} ===")
+    """Upload one (band, loader) JAR. Returns True on success, False on dry-run."""
+    print(f"\n=== {mod_version}+mc{band}-{loader} ===")
 
     metadata = {
         "changelog": changelog,
         "changelogType": changelog_type,
-        "displayName": f"slashlootr-{mod_version}+mc{band}.jar",
+        "displayName": f"slashlootr-{mod_version}+mc{band}-{loader}.jar",
         "gameVersions": game_version_ids,
         "releaseType": release_type,
     }
@@ -315,6 +318,7 @@ def main() -> int:
     p.add_argument("--release-dir", default="build/release", help="Directory containing JARs")
     p.add_argument("--changelog-file", default="CHANGELOG.md", help="Path to changelog file")
     p.add_argument("--bands", help="Comma-separated MC bands to upload (default: all discovered)")
+    p.add_argument("--loaders", help="Comma-separated loaders to upload: fabric,neoforge (default: all discovered)")
     p.add_argument("--changelog-format", default="html", choices=["html", "markdown", "text"],
                    help="changelogType to send. Default 'html' (we convert the .md source to "
                         "HTML client-side because CurseForge's 'markdown' type renders raw markup).")
@@ -347,19 +351,27 @@ def main() -> int:
         print(f"ERR release dir not found: {release_dir}")
         return 1
 
-    by_band = discover_jars(release_dir, args.version)
-    if not by_band:
+    found = discover_jars(release_dir, args.version)
+    if not found:
         print(f"ERR no JARs found matching version {args.version} in {release_dir}")
         return 1
 
     if args.bands:
         wanted = {b.strip() for b in args.bands.split(",")}
-        by_band = {b: v for b, v in by_band.items() if b in wanted}
-        if not by_band:
+        found = {k: v for k, v in found.items() if k[0] in wanted}
+        if not found:
             print(f"ERR no bands matching --bands={args.bands}")
             return 1
 
-    print(f"Discovered {len(by_band)} band(s) for v{args.version}: {sorted(by_band)}")
+    if args.loaders:
+        wanted_loaders = {l.strip().lower() for l in args.loaders.split(",")}
+        found = {k: v for k, v in found.items() if k[1] in wanted_loaders}
+        if not found:
+            print(f"ERR no files matching --loaders={args.loaders}")
+            return 1
+
+    print(f"Discovered {len(found)} file(s) for v{args.version}: "
+          f"{[f'{b}-{l}' for b, l in sorted(found)]}")
 
     full_file = (args.changelog_file != "CHANGELOG.md")
     raw_changelog = extract_changelog(project_root / args.changelog_file, args.version, full_file)
@@ -386,12 +398,14 @@ def main() -> int:
 
     failures = 0
     successes = 0
-    for band in sorted(by_band):
-        jar = by_band[band]
+    for band, loader in sorted(found):
+        jar = found[(band, loader)]
+        loader_name = "NeoForge" if loader == "neoforge" else "Fabric"
         mc_versions = BAND_GAME_VERSIONS.get(band, [band])
         java_version = BAND_JAVA_VERSION.get(band, "Java 21")
         if catalog:
-            game_version_ids = resolve_game_version_ids(catalog, type_ids, mc_versions, java_version, band)
+            game_version_ids = resolve_game_version_ids(
+                catalog, type_ids, mc_versions, java_version, band, loader_name)
         else:
             game_version_ids = [-1]  # dry-run placeholder
         try:
@@ -399,6 +413,7 @@ def main() -> int:
                 project_id=args.project_id,
                 mod_version=args.version,
                 band=band,
+                loader=loader,
                 jar=jar,
                 game_version_ids=game_version_ids,
                 release_type=args.type,
@@ -415,7 +430,7 @@ def main() -> int:
         if not args.dry_run:
             time.sleep(0.5)
 
-    skipped = len(by_band) - successes - failures
+    skipped = len(found) - successes - failures
     print(f"\nDone - {successes} uploaded, {failures} failed, {skipped} skipped")
     return 1 if failures else 0
 

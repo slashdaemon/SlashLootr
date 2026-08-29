@@ -1,0 +1,90 @@
+// Composes one Fabric band JAR out of the shared source tree.
+//
+// A band's build.gradle declares only which compat variants it needs:
+//
+//   ext.slashloot = [ids: "location", vehicle: "legacy", store: "nbt"]
+//   apply from: "${rootDir}/gradle/fabric-band.gradle"
+//
+//   ids       location | identifier    ResourceLocation vs Identifier (flipped at MC 1.21.11)
+//   vehicle   legacy | container | moved
+//                                     ContainerEntity#getLootTable -> getContainerLootTable (1.21.2)
+//                                     and the vehicle package move (1.21.11)
+//   store     nbt | codec              SavedData.Factory vs SavedDataType + Codec (1.21.6)
+//   savedtype string | id              SavedDataType key type (Identifier from 26.1); codec only
+//   open      player | containeruser   Container#startOpen/stopOpen parameter (ContainerUser from
+//                                     MC 1.21.9)
+//
+// Everything else -- all the actual mod logic -- comes from mc-src/ and is compiled exactly once
+// per band with no per-band copies to drift.
+
+def variants = project.ext.slashloot
+assert variants.ids in ["location", "identifier"]
+assert variants.vehicle in ["legacy", "container", "moved"]
+assert variants.store in ["nbt", "codec"]
+assert variants.open in ["player", "containeruser"]
+
+version = ""
+
+tasks.withType(JavaCompile).configureEach {
+    it.options.release = 21
+    it.options.encoding = "UTF-8"
+}
+
+base {
+    archivesName = "${rootProject.archives_base_name}-${rootProject.mod_version}+mc${project.minecraft_version}-fabric"
+}
+
+dependencies {
+    minecraft "com.mojang:minecraft:${project.minecraft_version}"
+    mappings loom.officialMojangMappings()
+    modImplementation "net.fabricmc:fabric-loader:${rootProject.loader_version}"
+    modImplementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
+}
+
+// --- shared source composition -------------------------------------------------------------
+
+def shared = [
+        "common/src/main/java",                            // SeedDeriver (pure Java, no MC types)
+        "mc-src/src/main/java",                            // all loader- and version-neutral logic
+        "compat/ids-${variants.ids}/src/main/java",
+        "compat/vehicle-${variants.vehicle}/src/main/java",
+        "compat/store-${variants.store}/src/main/java",
+        "compat/open-${variants.open}/src/main/java",
+        "loader-fabric/src/main/java",
+]
+if (variants.store == "codec") {
+    def savedtype = variants.savedtype ?: "string"
+    assert savedtype in ["string", "id"]
+    shared += "compat/savedtype-${savedtype}/src/main/java"
+}
+
+shared.each { rel -> sourceSets.main.java.srcDirs += rootProject.file(rel) }
+sourceSets.main.resources.srcDirs += rootProject.file("loader-fabric/src/main/resources")
+
+// Java level: 21 everywhere we currently ship on this composite. Bands on the 26.x line run under
+// JDK 25 and set these in their own gradle.properties, so the shared metadata files stay single
+// copies instead of forking per band.
+def javaVersion = project.findProperty("java_version") ?: "21"
+def mixinCompat = project.findProperty("mixin_compat") ?: "JAVA_21"
+
+processResources {
+    inputs.property "version", rootProject.mod_version
+    inputs.property "minecraft_version", project.minecraft_version
+    inputs.property "java_version", javaVersion
+    inputs.property "mixin_compat", mixinCompat
+
+    filesMatching("fabric.mod.json") {
+        expand "version": rootProject.mod_version,
+                "minecraft_version": project.minecraft_version,
+                "java_version": javaVersion
+    }
+    filesMatching("slashlootr.mixins.json") {
+        expand "mixin_compat": mixinCompat
+    }
+}
+
+jar {
+    from("${rootProject.projectDir}/LICENSE") {
+        rename { "${it}_slashlootr" }
+    }
+}

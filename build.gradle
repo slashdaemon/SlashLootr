@@ -10,6 +10,7 @@ allprojects {
     repositories {
         mavenCentral()
         maven { url "https://maven.fabricmc.net/" }
+        maven { url "https://maven.neoforged.net/releases" }
     }
 }
 
@@ -25,26 +26,16 @@ subprojects {
     }
 }
 
-project(":common") {
-    tasks.withType(JavaCompile).configureEach {
-        it.options.release = 17
-    }
-    java {
-        sourceCompatibility = JavaVersion.VERSION_17
-        targetCompatibility = JavaVersion.VERSION_17
-    }
-}
-
 // Detect host OS so we can pick gradlew vs gradlew.bat when shelling out to
-// quarantined bands (Band F uses its own Gradle 9.4 wrapper + JDK 25 toolchain).
+// quarantined bands (Band G uses its own Gradle 9.4 wrapper + JDK 25 toolchain).
 def isWindows = System.getProperty("os.name").toLowerCase(java.util.Locale.ROOT).contains("windows")
 
-// Quarantined Band F (MC 26.1.2). Lives in versions/26.1.2/ with its own Gradle 9.4
-// wrapper + Loom 1.15.5 + JDK 25 — incompatible with this composite's Loom 1.11.x
+// Quarantined Band G (MC 26.1.2). Lives in versions/26.1.2/ with its own Gradle 9.4
+// wrapper + Loom 1.15.5 + JDK 25 — incompatible with this composite's Loom 1.13.6
 // so we shell out rather than including it as a subproject.
 tasks.register("build26", Exec) {
     group = "build"
-    description = "Builds Band F (MC 26.1.x) via its own quarantined wrapper."
+    description = "Builds Band G (MC 26.1.x) via its own quarantined wrapper."
     workingDir = file("versions/26.1.2")
     def wrapper = file("versions/26.1.2/${isWindows ? 'gradlew.bat' : 'gradlew'}").absolutePath
     commandLine = isWindows
@@ -52,44 +43,45 @@ tasks.register("build26", Exec) {
             : [wrapper, "build", "--no-daemon"]
 }
 
+// Bands built inside this composite. Band G is appended from the quarantine below.
+def fabricBands = [
+        "1.20.1-fabric",   // Band A: Java 17, forked sources (no RandomizableContainer interface)
+        "1.20.5-fabric",   // Band B
+        "1.21-fabric",     // Band C
+        "1.21.1-fabric",   // Band C: primary (TBA target)
+        "1.21.2-fabric",   // Band D: ContainerEntity#getContainerLootTable rename
+        "1.21.4-fabric",   // Band D
+        "1.21.6-fabric",   // Band E: SavedDataType/Codec replaces SavedData.Factory
+        "1.21.9-fabric",   // Band E
+        "1.21.11-fabric",  // Band F: Identifier rename, vehicle package move
+]
+
 tasks.register("buildAll") {
     group = "build"
-    description = "Builds all version band JARs and collects into build/release/"
-    dependsOn ":versions:1.20.1:build"   // Band A: Java 17, ResourceLocation, no RandomizableContainer interface
-    dependsOn ":versions:1.20.5:build"   // Band B: ResourceKey<LootTable>, HolderLookup added
-    dependsOn ":versions:1.21:build"     // Band C: same surface as 1.21.1
-    dependsOn ":versions:1.21.1:build"   // Band C: primary band (TBA target)
-    dependsOn ":versions:1.21.2:build"   // Band D: ContainerEntity.getContainerLootTable rename
-    dependsOn ":versions:1.21.4:build"   // Band D
-    dependsOn ":versions:1.21.6:build"   // Band E: SavedDataType/Codec replaces SavedData.Factory
-    dependsOn ":versions:1.21.9:build"   // Band E
-    dependsOn ":versions:1.21.11:build"  // Band F: ChestBoat→boat.ChestBoat, ResourceLocation→Identifier, SimpleContainer.addListener gone
-    dependsOn "build26"                  // Band G: MC 26.1.x (quarantined; JDK 25, Loom 1.15.5, unobfuscated)
+    description = "Builds every band JAR and collects them into build/release/"
+    fabricBands.each { dependsOn ":versions:${it}:build" }
+    dependsOn "build26"                  // Band G: MC 26.1.x (quarantined)
 
     doLast {
         def releaseDir = layout.buildDirectory.dir("release").get().asFile
         releaseDir.deleteDir()
         releaseDir.mkdirs()
 
-        def bands = ["1.20.1", "1.20.5", "1.21", "1.21.1", "1.21.2", "1.21.4", "1.21.6", "1.21.9", "1.21.11"]
-        bands.each { band ->
-            def libsDir = project(":versions:${band}").layout.buildDirectory.dir("libs").get().asFile
+        def collect = { File libsDir ->
             libsDir.listFiles()?.each { jar ->
                 if (jar.name.endsWith(".jar") && !jar.name.contains("-dev") && !jar.name.contains("-sources")) {
-                    java.nio.file.Files.copy(jar.toPath(), new File(releaseDir, jar.name).toPath())
+                    def dest = new File(releaseDir, jar.name)
+                    if (dest.exists()) dest.delete()
+                    java.nio.file.Files.copy(jar.toPath(), dest.toPath())
                 }
             }
         }
 
-        // Band F lives outside the composite; its JARs sit in versions/26.1.2/build/libs/.
-        def quarantinedLibs = file("versions/26.1.2/build/libs")
-        quarantinedLibs.listFiles()?.each { jar ->
-            if (jar.name.endsWith(".jar") && !jar.name.contains("-dev") && !jar.name.contains("-sources")) {
-                def dest = new File(releaseDir, jar.name)
-                if (dest.exists()) dest.delete()
-                java.nio.file.Files.copy(jar.toPath(), dest.toPath())
-            }
+        fabricBands.each { band ->
+            collect(project(":versions:${band}").layout.buildDirectory.dir("libs").get().asFile)
         }
+        // Band G lives outside the composite; its JARs sit in versions/26.1.2/build/libs/.
+        collect(file("versions/26.1.2/build/libs"))
 
         println "Collected ${releaseDir.listFiles()?.length ?: 0} JARs in ${releaseDir.path}"
     }

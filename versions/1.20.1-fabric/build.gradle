@@ -1,0 +1,48 @@
+// Band A - MC 1.20.1 (Java 17).
+//
+// The only band that does NOT share mc-src. At 1.20.1 there is no RandomizableContainer interface
+// (the mixin has to target RandomizableContainerBlockEntity directly), loot tables are plain
+// ResourceLocation rather than ResourceKey<LootTable>, and the loot-table fields are private so
+// they need @Accessor mixins. Abstracting that away would cost every other band a generic
+// loot-reference type to serve one legacy Fabric-only version, so this band keeps its own copy of
+// the sources and the same fixes are applied here by hand.
+plugins {
+    id "fabric-loom"
+}
+
+version = ""
+
+tasks.withType(JavaCompile).configureEach {
+    it.options.release = 17
+    it.options.encoding = "UTF-8"
+}
+
+base {
+    archivesName = "${rootProject.archives_base_name}-${rootProject.mod_version}+mc${project.minecraft_version}-fabric"
+}
+
+dependencies {
+    minecraft "com.mojang:minecraft:${project.minecraft_version}"
+    mappings loom.officialMojangMappings()
+    modImplementation "net.fabricmc:fabric-loader:${rootProject.loader_version}"
+    modImplementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
+}
+
+// SeedDeriver is plain Java with no Minecraft types, so it compiles straight in rather than
+// riding along as a jar-in-jar.
+sourceSets.main.java.srcDirs += rootProject.file("common/src/main/java")
+
+processResources {
+    inputs.property "version", rootProject.mod_version
+    inputs.property "minecraft_version", project.minecraft_version
+
+    filesMatching("fabric.mod.json") {
+        expand "version": rootProject.mod_version, "minecraft_version": project.minecraft_version
+    }
+}
+
+jar {
+    from("${rootProject.projectDir}/LICENSE") {
+        rename { "${it}_slashlootr" }
+    }
+}
