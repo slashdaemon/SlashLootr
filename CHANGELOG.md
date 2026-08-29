@@ -4,127 +4,119 @@ All notable changes to SlashLootr. Dates are YYYY-MM-DD.
 
 ## 0.3.0 — 2026-08-29
 
-**NeoForge support, and coverage out to MC 26.2.** 22 JARs, up from 10.
+**Built to sit inside somebody else's modpack.** Almost everything here is SlashLoot learning to do
+less: leaving containers it does not own alone, handing blacklisted loot back to vanilla, letting
+chests behave like chests. And it now runs on NeoForge, across every version Fabric already had.
 
-> 0.2.0 was built and verified but never published, so a 0.3.0 release carries both entries.
-> Publish with the full changelog, not just this section.
+Thanks to **TheArchictect** on CurseForge, who reported four of these.
 
-### Added
+### Containers SlashLoot does not own are left alone
 
-- **NeoForge builds** for MC 1.20.6, 1.21–1.21.1, 1.21.2–1.21.3, 1.21.4, 1.21.5, 1.21.6–1.21.8,
-  1.21.9–1.21.10, 1.21.11, 26.1.2, and 26.2. Same mod, same behaviour, same save data — the shared
-  tree from 0.2.0 is loader-neutral, so NeoForge needed one adapter (`loader-neoforge/`) and per-band
-  build files, and no changes at all to the mod logic or the mixins. NeoForge is Mojang-mapped like
-  our Loom builds, so the mixins apply unchanged with no refmap.
-- **MC 26.2 ("Chaos Cubed")** on both loaders, as a quarantined composite beside 26.1.
-- **MC 1.21.5 on Fabric** — see the fix below.
+- **Blacklisted dimensions and loot tables no longer serve empty containers.** If you put a
+  dimension or a loot table on a blocklist, that container now behaves exactly as it would with
+  SlashLoot uninstalled: shared vanilla loot, working hoppers, working comparators. Previously the
+  blocklist stopped SlashLoot from serving the container but did not stop it from suppressing the
+  vanilla roll, so nobody filled it and it stayed empty forever.
+- **Modded containers are no longer broken by association.** The vanilla method SlashLoot hooks is
+  shared by every container type in the game, including ones from other mods that it has no idea how
+  to serve. Those are now left completely untouched. If you *want* SlashLoot to instance unknown
+  modded containers, set `handleUnknownContainers: true`.
+- **Container size is read from the container** instead of being assumed to be 27 slots, so a modded
+  chest with a different inventory size gets a personal copy of the right shape.
 
-### Fixed
+### Chests behave like chests again
 
-- **The 1.21.4 JAR was advertised for MC 1.21.5 and would not have run there.** `SavedData.Factory`
-  was removed at **1.21.5**, not 1.21.6 as the 0.1.x metadata assumed; the CompoundTag-based store
-  cannot compile, let alone load, against 1.21.5. Verified by building the store against 1.21.5 and
-  watching it fail. 1.21.5 now has its own band on both loaders, and the 1.21.4 band no longer
-  claims it.
-- **Break cleanup no longer trusts the break event.** NeoForge's break event fires *before* the
-  break and is cancellable, unlike Fabric's `AFTER`; acting on it directly would discard a player's
-  loot for a container another mod then saves. The position now jumps the prune queue and is
-  re-checked on the next tick by the same decision function the rest of the mod uses. The prune
-  queue is also drained regardless of `pruneIntervalTicks`, so break cleanup still lands promptly
-  when the background sweep is disabled.
+- **Lids animate.** Chest and shulker lids open, barrels flip their `open` state, and both halves of
+  a double chest animate together. The open sound now comes from vanilla, so it plays once.
+- **Trapped chests emit redstone again.** This had been silently broken since 0.1.0.
+- Turn it off with `delegateContainerAnimation: false` if it conflicts with something.
 
-### Coverage notes
+### It cleans up after itself
 
-- **NeoForge has no 1.20.1**, which is reachable only through the legacy ModDevGradle plugin, so
-  Band A stays Fabric-only and NeoForge starts at 1.20.6 (there is no NeoForge 1.20.5 line).
-- **NeoForge 21.6, 21.7 and 21.9 have no stable builds** — every published `21.6.x` and `21.9.x` is
-  a `-beta` (verified against `maven.neoforged.net`). Those MC versions are covered by the 21.8 and
-  21.10 builds rather than getting bands of their own.
+Stored loot for a container is dropped when that container is destroyed, so a long-running server
+does not accumulate dead entries. Three layers cover the ways a container can vanish: breaking it,
+destroying the minecart or boat carrying it, and a low-cost background sweep that catches
+explosions, pistons, and world edits. Tune with `cleanupOnBreak`, `pruneIntervalTicks`, and
+`pruneBatchSize`.
 
-### Internal
+### You can ask it what it decided
 
-- `loader-neoforge/` mirrors `loader-fabric/`: a `LoaderBridge` implementation plus a `@Mod`
-  entrypoint. Nothing else in the tree names a loader type.
-- One NeoForge-side compat axis was needed: MC 26.1 replaced `BlockEvent.BreakEvent` with
-  `event.level.block.BreakBlockEvent`, isolated in `loader-neoforge/variants/break-*`.
-- The 26.1.2 quarantine became a two-subproject composite (`band-fabric`, `band-neoforge`), and
-  26.2 was forked from it. The root `build26` / `build262` tasks drive them.
-- JARs are `slashlootr-<version>+mc<band>-<loader>.jar`; the publish scripts key their game-version
-  and Java-version maps on `(band, loader)`.
+Set `debugLogging: true` and SlashLoot logs one line per container: position, loot table, whether it
+served a personal copy or handed the container to vanilla, and why.
 
-### Runtime verified
+```
+[SlashLoot] block chest @ minecraft:overworld [123,64,-45] table=minecraft:chests/simple_dungeon -> INSTANCE reason=instanced slots=27
+[SlashLoot] block minecraft:hopper @ minecraft:overworld [110,-60,100] table=minecraft:chests/village/village_weaponsmith -> VANILLA reason=unsupported_container:minecraft:hopper
+```
 
-- **NeoForge 1.21.1**: booted a real NeoForge server and re-ran the 0.2.0 sweep — instanced
-  container keeps its loot table, blacklisted table falls back to real vanilla loot, and a
-  loot-table hopper (an unsupported container) falls back too. Commands, config reload, and
-  decision logging all behave identically to Fabric. No mixin warnings on boot.
-- All 22 band/loader combinations compile clean.
+Repeat verdicts are deduplicated, so hopper polling cannot flood the log. Built for exactly the job
+of working out why a container in a big pack behaves the way it does.
 
-## 0.2.0 — 2026-08-29 (not published; folded into 0.3.0)
+### NeoForge, and Minecraft 26.2
 
-Compatibility release, driven by modpack-author feedback on the CurseForge page.
+- **NeoForge builds** for 1.20.6, 1.21 through 1.21.1, 1.21.2 through 1.21.3, 1.21.4, 1.21.5,
+  1.21.6 through 1.21.8, 1.21.9 through 1.21.10, 1.21.11, 26.1.2, and 26.2. Same mod, same
+  behaviour, same save data.
+- **Minecraft 26.2** on both loaders.
+- JARs are now named `slashlootr-<version>+mc<band>-<loader>.jar`. Mind the suffix when you pick one.
 
-### Fixed
+Two gaps worth knowing about, both outside our control: NeoForge has no 1.20.1 or 1.20.5 line, so
+Fabric covers those alone; and NeoForge has published no stable 21.6, 21.7 or 21.9 build, so
+Minecraft 1.21.6 through 1.21.8 and 1.21.9 through 1.21.10 are served by the 21.8 and 21.10 builds.
 
-- **Blacklisted dimensions and loot tables served empty containers.** The loot-cancelling mixins
-  cancelled the vanilla roll unconditionally while the interaction handlers skipped anything
-  blacklisted, so a blacklisted container was never rolled by anyone. Both sides now ask the same
-  question through a single decision function (`core/Handling`), and a "vanilla" verdict means the
-  container behaves exactly as if SlashLoot were not installed — including hopper extraction and
-  comparator output.
-- **Unknown modded containers were broken the same way.** `unpackLootTable` is a default method on
-  the `RandomizableContainer` interface, so the mixin fired for every implementor in the game,
-  including containers SlashLoot has no idea how to serve. Anything not actually instanced is now
-  left completely alone. Opt in with `handleUnknownContainers`.
-- **Container slot count is read from the world container** instead of assuming 27, so a modded
-  chest with a different inventory size is no longer silently truncated.
-- **`/slashloot forget all` works.** It previously printed an instruction to stop the server and
-  delete the `.dat` file by hand.
+### Version coverage correction
 
-### Added
+**If you run Minecraft 1.21.5 on Fabric, the old download did not work and you should take the new
+1.21.5 file.** Releases up to 0.1.2 advertised the 1.21.4 JAR as covering 1.21.5. It never could:
+Minecraft removed the save-data API that build relies on at 1.21.5, one version earlier than the
+metadata assumed. 1.21.5 now has its own build on both loaders.
 
-- **Chest lids animate again.** Personal containers delegate `startOpen`/`stopOpen` to the real
-  world container, so vanilla's `ContainerOpenersCounter` runs: chest and shulker lids animate,
-  barrels flip their `open` blockstate, and **trapped chests emit redstone**. Both halves of a
-  double chest animate. Controlled by `delegateContainerAnimation` (default on); with it on, the
-  manual open sound is suppressed so the sound does not play twice.
-- **Stored loot is cleaned up when a container is destroyed**, in three layers: the player-break
-  event, a loader-neutral mixin on entity removal (filtered on `RemovalReason#shouldDestroy` so a
-  chunk unload never wipes a chest minecart), and a background prune that re-checks stored
-  positions in loaded chunks to catch explosions, pistons, and world edits.
-  Config: `cleanupOnBreak`, `pruneIntervalTicks`, `pruneBatchSize`.
-- **Optional decision logging** (`debugLogging`). One line per container giving position, loot
-  table, verdict, and reason (`dimension_blocklisted`, `unsupported_container:<id>`, …). Emitted
-  from the decision function itself, so it always reflects what actually happened. Repeat verdicts
-  for the same container are deduplicated so hopper polling cannot flood the log.
-- **New commands:** `/slashloot prune`, `/slashloot stats`, `/slashloot reload`.
-- **New config keys:** `enabled`, `handleUnknownContainers`, `delegateContainerAnimation`,
-  `cleanupOnBreak`, `pruneIntervalTicks`, `pruneBatchSize`, `debugLogging`. Missing keys take
-  their defaults, so a 0.1.x config keeps working.
+### New commands
 
-### Changed
+`/slashloot forget all` now works (it previously printed instructions to stop the server and delete
+a file by hand). Also new: `/slashloot prune`, `/slashloot stats`, and `/slashloot reload`.
 
-- **JARs are now named `slashlootr-<version>+mc<band>-fabric.jar`.** The loader suffix makes room
-  for the NeoForge builds landing in 0.3.0.
-- **Band G (26.1.2) mixin config now declares `JAVA_25`**, matching the JDK it is compiled with.
-  It was shipping `JAVA_21`.
+### Config
 
-### Internal
+Every key is optional and defaults sensibly, so a config file from an older version keeps working.
+`/slashloot reload` re-reads it without a restart.
 
-- **The nine per-band source forks are gone.** All bands from 1.20.5 up compile one shared tree
-  (`mc-src/`) plus small per-generation compat variants (`compat/ids-*`, `vehicle-*`, `store-*`,
-  `savedtype-*`, `open-*`) and a loader adapter (`loader-fabric/`). A fix is written once instead
-  of nine times. Band A (1.20.1) remains a self-contained fork — it predates the
-  `RandomizableContainer` interface and `ResourceKey<LootTable>` — and carries the same fixes.
-- Mod id, `config/slashlootr.json`, and `world/<dim>/data/slashlootr.dat` are unchanged, so
-  existing server data carries over untouched.
+```json
+{
+  "enabled": true,
+  "dimensionBlocklist": [],
+  "lootTableBlocklist": [],
+  "handleUnknownContainers": false,
+  "delegateContainerAnimation": true,
+  "playOpenCloseSounds": true,
+  "cleanupOnBreak": true,
+  "pruneIntervalTicks": 6000,
+  "pruneBatchSize": 256,
+  "debugLogging": false
+}
+```
 
-### Runtime verified
+Mod id, config path, and the per-dimension save file are unchanged, so existing server data carries
+over untouched.
 
-- Band C (1.21.1): blacklist fallback, unknown-container fallback, and decision logging verified
-  end-to-end on a headless server for chests, barrels, hoppers-with-loot-tables, and chest
-  minecarts. Commands and config reload exercised over RCON. No mixin warnings on boot.
-- Bands A, B, D, E, F, G: compile-clean.
+### Under the hood
+
+- The nine per-band source forks are gone. Every band from 1.20.5 up now compiles one shared source
+  tree plus small per-generation compatibility shims, so a fix is written once instead of nine
+  times. 1.20.1 stays a documented fork; it predates the interfaces the rest of the tree relies on.
+- That shared tree is loader-neutral behind a single seam, which is why NeoForge needed one adapter
+  and no changes to the mod logic or the mixins at all.
+- The 26.1.2 mixin config now declares JAVA_25, matching the JDK it is compiled with. It was
+  shipping JAVA_21.
+- Break cleanup no longer trusts the break event. NeoForge fires its version before the break and
+  allows it to be cancelled, unlike Fabric, so the position is re-checked a tick later instead of
+  being dropped on faith.
+
+### Verified
+
+Band 1.21.1 was checked end to end on both loaders: instanced containers, blacklist fallback,
+unsupported-container fallback, commands, config reload, and decision logging. All 22 band and
+loader combinations build clean.
 
 ## 0.1.2 — 2026-05-31
 
