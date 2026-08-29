@@ -1,0 +1,8 @@
+// Band E NeoForge - MC 1.21.9-1.21.10 (NF 21.9 is beta-only, so we build on 21.10)
+plugins {
+    id "net.neoforged.moddev"
+}
+
+ext.slashloot = [ids: "location", vehicle: "container", store: "codec", open: "containeruser", savedtype: "string"]
+
+apply from: "${rootDir}/gradle/neoforge-band.gradle"

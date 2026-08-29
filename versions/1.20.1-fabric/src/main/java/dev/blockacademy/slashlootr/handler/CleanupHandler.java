@@ -45,13 +45,20 @@ public final class CleanupHandler {
 
     // ------------------------------------------------------------ immediate
 
+    /**
+     * A player is breaking, or has just broken, a block.
+     *
+     * <p>Deliberately does NOT drop the entry outright. Fabric surfaces this after the block is
+     * gone, but NeoForge's {@code BlockEvent.BreakEvent} fires <em>before</em> the break and is
+     * cancellable — acting on it directly would throw away a player's loot for a container another
+     * mod then saves. Instead the position jumps the prune queue and is re-checked on the next
+     * tick, where the same {@link Handling} call the rest of the mod uses decides whether the
+     * container is really gone.
+     */
     public static void onBlockBroken(ServerLevel level, BlockPos pos) {
         if (!SlashLootrConfig.get().cleanupOnBreak) return;
-        SlashLootrState store = SlashLootrState.get(level);
-        if (!store.hasBlockEntry(pos.asLong())) return;
-        store.forgetBlock(pos.asLong());
-        DebugLog.action("[SlashLoot] forgot stored loot at " + Handling.dimension(level) + " ["
-                + pos.getX() + "," + pos.getY() + "," + pos.getZ() + "] (block broken)");
+        if (!SlashLootrState.get(level).hasBlockEntry(pos.asLong())) return;
+        PENDING.computeIfAbsent(level.dimension(), k -> new ArrayDeque<>()).addFirst(pos.asLong());
     }
 
     /** Called from {@code MixinEntityRemoved} when a container entity is destroyed for good. */
@@ -67,10 +74,12 @@ public final class CleanupHandler {
 
     public static void onServerTick(MinecraftServer server) {
         SlashLootrConfig config = SlashLootrConfig.get();
-        if (config.pruneIntervalTicks <= 0) return;
-
         tickCounter++;
-        boolean startNewPass = tickCounter % config.pruneIntervalTicks == 0;
+
+        // pruneIntervalTicks only governs how often a full sweep STARTS. A queue with entries in it
+        // is always drained, so break-triggered re-checks still land promptly with pruning off.
+        boolean startNewPass = config.pruneIntervalTicks > 0
+                && tickCounter % config.pruneIntervalTicks == 0;
 
         for (ServerLevel level : server.getAllLevels()) {
             ResourceKey<Level> key = level.dimension();
@@ -103,7 +112,7 @@ public final class CleanupHandler {
         }
         if (removed > 0) {
             lastRemoved += removed;
-            DebugLog.action("[SlashLoot] pruned " + removed + " stale container entries in "
+            DebugLog.action("[SlashLoot] dropped " + removed + " stale container entries in "
                     + Handling.dimension(level));
         }
     }

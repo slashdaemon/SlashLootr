@@ -1,0 +1,56 @@
+// Quarantined Band J composite (MC 26.2.x "Chaos Cubed"), one subproject per loader.
+// Forked from versions/26.1.2/ — same shared tree, same variant selection.
+//
+// Runs under its own Gradle 9.4 wrapper and JDK 25 because Loom 1.15.5 is incompatible with the
+// parent composite's Loom 1.13.6. The parent shells out to this build via its `build26` task; it is
+// NOT included as a subproject.
+//
+// Both subprojects compile the SAME shared source tree as every other band — mc-src/ plus the
+// compat variants — reached by relative path, since the parent project model is not visible here.
+// Band J variants: ids=identifier, vehicle=moved, store=codec, savedtype=id, open=containeruser.
+
+plugins {
+    id "java"
+    id "net.fabricmc.fabric-loom" version "1.15.5" apply false
+    id "net.neoforged.moddev" version "2.0.144" apply false
+}
+
+allprojects {
+    group = project.maven_group
+    version = ""
+
+    repositories {
+        mavenCentral()
+        maven { url "https://maven.fabricmc.net/" }
+        maven { url "https://maven.neoforged.net/releases" }
+    }
+}
+
+subprojects {
+    apply plugin: "java"
+
+    java {
+        withSourcesJar()
+        toolchain {
+            languageVersion = JavaLanguageVersion.of(25)
+        }
+    }
+
+    tasks.withType(JavaCompile).configureEach {
+        it.options.release = 25
+        it.options.encoding = "UTF-8"
+    }
+
+    // Repo root, four levels up from versions/26.1.2/<band>/.
+    ext.repoRoot = rootProject.file("../..")
+
+    ext.sharedSourceDirs = [
+            "common/src/main/java",
+            "mc-src/src/main/java",
+            "compat/ids-identifier/src/main/java",
+            "compat/vehicle-moved/src/main/java",
+            "compat/store-codec/src/main/java",
+            "compat/savedtype-id/src/main/java",
+            "compat/open-containeruser/src/main/java",
+    ]
+}

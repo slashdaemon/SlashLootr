@@ -46,18 +46,44 @@ except ImportError:
 MODRINTH_API = "https://api.modrinth.com/v2"
 
 # Per-band Minecraft versions to advertise. Mirrors publish-curseforge.py.
+# Keyed by (mc_band, loader) because the two loaders do not cover the same MC versions:
+# NeoForge has no line below 1.20.5, and NF 21.6 / 21.7 / 21.9 have no stable builds at all
+# (every published 21.6.x / 21.9.x is a -beta), so those MC versions ride the 21.8 and 21.10 JARs.
+#
+# NOTE: 1.21.4 does NOT cover 1.21.5. SavedData.Factory was removed at 1.21.5, not 1.21.6 as
+# earlier metadata assumed — verified by compiling the CompoundTag store against 1.21.5 and
+# watching it fail. 0.1.x advertised the 1.21.4 JAR for 1.21.5; it would not have run there.
+# 1.21.5 now has its own band on both loaders.
 BAND_GAME_VERSIONS = {
-    "1.20.1":  ["1.20.1"],
-    "1.20.5":  ["1.20.5", "1.20.6"],
-    "1.21":    ["1.21"],
-    "1.21.1":  ["1.21.1"],
-    "1.21.2":  ["1.21.2", "1.21.3"],
-    "1.21.4":  ["1.21.4", "1.21.5"],
-    "1.21.6":  ["1.21.6", "1.21.7", "1.21.8"],
-    "1.21.9":  ["1.21.9", "1.21.10"],
-    "1.21.11": ["1.21.11"],
-    "26.1.2":  ["26.1.2"],
+    ("1.20.1",  "fabric"):   ["1.20.1"],
+    ("1.20.5",  "fabric"):   ["1.20.5", "1.20.6"],
+    ("1.21",    "fabric"):   ["1.21"],
+    ("1.21.1",  "fabric"):   ["1.21.1"],
+    ("1.21.2",  "fabric"):   ["1.21.2", "1.21.3"],
+    ("1.21.4",  "fabric"):   ["1.21.4"],
+    ("1.21.5",  "fabric"):   ["1.21.5"],
+    ("1.21.6",  "fabric"):   ["1.21.6", "1.21.7", "1.21.8"],
+    ("1.21.9",  "fabric"):   ["1.21.9", "1.21.10"],
+    ("1.21.11", "fabric"):   ["1.21.11"],
+    ("26.1.2",  "fabric"):   ["26.1.2"],
+    ("26.2",    "fabric"):   ["26.2"],
+
+    ("1.20.6",  "neoforge"): ["1.20.6"],
+    ("1.21.1",  "neoforge"): ["1.21", "1.21.1"],
+    ("1.21.3",  "neoforge"): ["1.21.2", "1.21.3"],
+    ("1.21.4",  "neoforge"): ["1.21.4"],
+    ("1.21.5",  "neoforge"): ["1.21.5"],
+    ("1.21.8",  "neoforge"): ["1.21.6", "1.21.7", "1.21.8"],
+    ("1.21.10", "neoforge"): ["1.21.9", "1.21.10"],
+    ("1.21.11", "neoforge"): ["1.21.11"],
+    ("26.1.2",  "neoforge"): ["26.1.2"],
+    ("26.2",    "neoforge"): ["26.2"],
 }
+
+
+def game_versions_for(band: str, loader: str) -> list[str]:
+    """MC versions a given (band, loader) JAR is advertised for."""
+    return BAND_GAME_VERSIONS.get((band, loader), [band])
 
 # Fabric API (Modrinth project ID P7dR8mSH) is required on Fabric only — the NeoForge
 # builds reach the same events through NeoForge's own bus and depend on nothing extra.
@@ -294,12 +320,11 @@ def main() -> int:
         print(f"Project: {args.project} -> id={project_id}")
         try:
             known = fetch_known_game_versions()
-            seen = {band for band, _ in found}
-            for band in seen:
-                requested = BAND_GAME_VERSIONS.get(band, [band])
+            for band, loader in sorted(found):
+                requested = game_versions_for(band, loader)
                 missing = [v for v in requested if v not in known]
                 if missing:
-                    print(f"WARN band {band}: Modrinth doesn't recognize {missing}; "
+                    print(f"WARN {band}-{loader}: Modrinth doesn't recognize {missing}; "
                           f"those entries will be silently dropped on upload")
         except Exception as e:
             print(f"WARN could not fetch known game versions: {e}")
@@ -308,7 +333,7 @@ def main() -> int:
     successes = 0
     for band, loader in sorted(found):
         jar = found[(band, loader)]
-        game_versions = BAND_GAME_VERSIONS.get(band, [band])
+        game_versions = game_versions_for(band, loader)
         try:
             if upload_version(
                 project=args.project,

@@ -59,7 +59,8 @@ if (variants.store == "codec") {
 }
 
 shared.each { rel -> sourceSets.main.java.srcDirs += rootProject.file(rel) }
-sourceSets.main.resources.srcDirs += rootProject.file("loader-fabric/src/main/resources")
+sourceSets.main.resources.srcDirs += rootProject.file("mc-src/src/main/resources")      // mixin config
+sourceSets.main.resources.srcDirs += rootProject.file("loader-fabric/src/main/resources") // fabric.mod.json
 
 // Java level: 21 everywhere we currently ship on this composite. Bands on the 26.x line run under
 // JDK 25 and set these in their own gradle.properties, so the shared metadata files stay single

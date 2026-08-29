@@ -1,6 +1,6 @@
 # SlashLootr
 
-Server-side per-player loot for naturally-generated containers in Minecraft. **No client install required. No custom blocks.**
+Server-side per-player loot for naturally-generated containers in Minecraft. **Fabric and NeoForge. No client install required. No custom blocks.**
 
 ## What it does
 
@@ -19,32 +19,47 @@ Architecture deep-dive: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
 ## Supported versions
 
-10 bands, all built via `./gradlew buildAll`. Pick the JAR that matches your server's Minecraft version. Band G (26.1.2) is quarantined — it compiles with its own Gradle 9.4 wrapper + JDK 25 + Loom 1.15.5 because Mojang shipped 26.1 unobfuscated.
+22 JARs — 12 Fabric, 10 NeoForge. Pick the one matching your server's Minecraft version **and
+loader**. Files are named `slashlootr-<version>+mc<band>-<loader>.jar`.
 
-| Minecraft | Fabric API      | JAR                                 |
-| --------- | --------------- | ----------------------------------- |
-| 1.20.1    | 0.92.2+1.20.1   | `slashlootr-0.2.0+mc1.20.1-fabric.jar`  |
-| 1.20.5    | 0.97.8+1.20.5   | `slashlootr-0.2.0+mc1.20.5-fabric.jar`  |
-| 1.21      | 0.102.0+1.21    | `slashlootr-0.2.0+mc1.21-fabric.jar`    |
-| 1.21.1    | 0.115.6+1.21.1  | `slashlootr-0.2.0+mc1.21.1-fabric.jar`  |
-| 1.21.2    | 0.106.1+1.21.2  | `slashlootr-0.2.0+mc1.21.2-fabric.jar`  |
-| 1.21.4    | 0.114.0+1.21.4  | `slashlootr-0.2.0+mc1.21.4-fabric.jar`  |
-| 1.21.6    | 0.128.1+1.21.6  | `slashlootr-0.2.0+mc1.21.6-fabric.jar`  |
-| 1.21.9    | 0.134.1+1.21.9  | `slashlootr-0.2.0+mc1.21.9-fabric.jar`  |
-| 1.21.11   | 0.141.2+1.21.11 | `slashlootr-0.2.0+mc1.21.11-fabric.jar` |
-| 26.1.2    | 0.146.1+26.1.2  | `slashlootr-0.2.0+mc26.1.2-fabric.jar`  |
+NeoForge coverage differs slightly from Fabric: NeoForge has no 1.20.1 or 1.20.5 line, and no stable
+builds for 21.6 / 21.7 / 21.9 — MC 1.21.6–1.21.8 and 1.21.9–1.21.10 are covered by the 21.8 and
+21.10 builds instead.
 
-Each release also ships an exact-version Fabric API requirement — match it.
+The 26.1 and 26.2 bands are quarantined builds: their own Gradle 9.4 wrapper, JDK 25, and Loom
+1.15.5, because Mojang ships 26.x unobfuscated.
+
+| Minecraft | Loader | Fabric API (Fabric only) |
+| --------- | ------ | ------------------------ |
+| 1.20.1 | Fabric | 0.92.2+1.20.1 |
+| 1.20.5–1.20.6 | Fabric | 0.97.8+1.20.5 |
+| 1.20.6 | NeoForge | — |
+| 1.21 | Fabric | 0.102.0+1.21 |
+| 1.21.1 | Fabric | 0.115.6+1.21.1 |
+| 1.21–1.21.1 | NeoForge | — |
+| 1.21.2–1.21.3 | Fabric | 0.106.1+1.21.2 |
+| 1.21.2–1.21.3 | NeoForge | — |
+| 1.21.4 | Fabric / NeoForge | 0.114.0+1.21.4 |
+| 1.21.5 | Fabric / NeoForge | 0.127.1+1.21.5 |
+| 1.21.6–1.21.8 | Fabric | 0.128.1+1.21.6 |
+| 1.21.6–1.21.8 | NeoForge | — |
+| 1.21.9–1.21.10 | Fabric | 0.134.1+1.21.9 |
+| 1.21.9–1.21.10 | NeoForge | — |
+| 1.21.11 | Fabric / NeoForge | 0.141.2+1.21.11 |
+| 26.1.2 | Fabric / NeoForge | 0.146.1+26.1.2 |
+| 26.2 | Fabric / NeoForge | 0.158.0+26.2 |
+
+Fabric builds need Fabric API at the listed version. NeoForge builds need nothing beyond NeoForge itself.
 
 For the breakdown of which vanilla APIs each band needs and what was rewritten per band, see [`docs/ARCHITECTURE.md` § Per-band specifics](docs/ARCHITECTURE.md#per-band-specifics).
 
 ## Installation
 
-1. Drop the matching JAR into your server's `mods/` folder.
-2. Drop Fabric API for that Minecraft version into the same folder.
+1. Drop the matching JAR into your server's `mods/` folder — mind the `-fabric` / `-neoforge` suffix.
+2. On Fabric, drop Fabric API for that Minecraft version into the same folder. NeoForge needs no extra dependency.
 3. Restart the server.
 
-That's it. Clients connect with vanilla Fabric (no SlashLootr in their mods folder).
+That's it. Clients connect with an unmodified game (no SlashLoot in their mods folder).
 
 ## How it works (one paragraph)
 

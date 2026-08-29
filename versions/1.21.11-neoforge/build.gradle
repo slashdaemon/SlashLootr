@@ -1,0 +1,8 @@
+// Band F NeoForge - MC 1.21.11
+plugins {
+    id "net.neoforged.moddev"
+}
+
+ext.slashloot = [ids: "identifier", vehicle: "moved", store: "codec", open: "containeruser", savedtype: "string"]
+
+apply from: "${rootDir}/gradle/neoforge-band.gradle"

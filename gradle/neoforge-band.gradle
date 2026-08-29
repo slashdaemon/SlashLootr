@@ -1,0 +1,94 @@
+// Composes one NeoForge band JAR out of the same shared source tree the Fabric bands use.
+//
+// A band's build.gradle declares only which compat variants it needs, exactly as on Fabric:
+//
+//   ext.slashloot = [ids: "location", vehicle: "legacy", store: "nbt", open: "player"]
+//   apply from: "${rootDir}/gradle/neoforge-band.gradle"
+//
+// See gradle/fabric-band.gradle for what each axis means. The ONLY difference between the two
+// loaders below `mc-src/` is which loader adapter is compiled in: loader-neoforge/ instead of
+// loader-fabric/. The mixins are identical — NeoForge is Mojang-mapped, like our Loom builds, so
+// they apply unchanged with no refmap.
+
+def variants = project.ext.slashloot
+assert variants.ids in ["location", "identifier"]
+assert variants.vehicle in ["legacy", "container", "moved"]
+assert variants.store in ["nbt", "codec"]
+assert variants.open in ["player", "containeruser"]
+// NeoForge-only axis: BlockEvent.BreakEvent (<=1.21.11) vs event.level.block.BreakBlockEvent (26.1+).
+def nfbreak = variants.nfbreak ?: "blockevent"
+assert nfbreak in ["blockevent", "breakblockevent"]
+
+version = ""
+
+tasks.withType(JavaCompile).configureEach {
+    it.options.release = 21
+    it.options.encoding = "UTF-8"
+}
+
+base {
+    archivesName = "${rootProject.archives_base_name}-${rootProject.mod_version}+mc${project.minecraft_version}-neoforge"
+}
+
+neoForge {
+    version = project.neoforge_version
+
+    // No client run config: SlashLoot is server-side only and registers nothing client-facing.
+    runs {
+        server {
+            server()
+        }
+    }
+
+    mods {
+        slashlootr {
+            sourceSet sourceSets.main
+        }
+    }
+}
+
+// --- shared source composition (mirrors gradle/fabric-band.gradle) ---------------------------
+
+def shared = [
+        "common/src/main/java",                            // SeedDeriver (pure Java, no MC types)
+        "mc-src/src/main/java",                            // all loader- and version-neutral logic
+        "compat/ids-${variants.ids}/src/main/java",
+        "compat/vehicle-${variants.vehicle}/src/main/java",
+        "compat/store-${variants.store}/src/main/java",
+        "compat/open-${variants.open}/src/main/java",
+        "loader-neoforge/src/main/java",
+        "loader-neoforge/variants/break-${nfbreak}",
+]
+if (variants.store == "codec") {
+    def savedtype = variants.savedtype ?: "string"
+    assert savedtype in ["string", "id"]
+    shared += "compat/savedtype-${savedtype}/src/main/java"
+}
+
+shared.each { rel -> sourceSets.main.java.srcDirs += rootProject.file(rel) }
+sourceSets.main.resources.srcDirs += rootProject.file("mc-src/src/main/resources")        // mixin config
+sourceSets.main.resources.srcDirs += rootProject.file("loader-neoforge/src/main/resources") // neoforge.mods.toml
+
+def mixinCompat = project.findProperty("mixin_compat") ?: "JAVA_21"
+
+processResources {
+    inputs.property "version", rootProject.mod_version
+    inputs.property "neoforge_range", project.neoforge_range
+    inputs.property "minecraft_range", project.minecraft_range
+    inputs.property "mixin_compat", mixinCompat
+
+    filesMatching("META-INF/neoforge.mods.toml") {
+        expand "version": rootProject.mod_version,
+                "neoforge_range": project.neoforge_range,
+                "minecraft_range": project.minecraft_range
+    }
+    filesMatching("slashlootr.mixins.json") {
+        expand "mixin_compat": mixinCompat
+    }
+}
+
+jar {
+    from("${rootProject.projectDir}/LICENSE") {
+        rename { "${it}_slashlootr" }
+    }
+}

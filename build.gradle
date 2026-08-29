@@ -1,6 +1,7 @@
 plugins {
     id "java"
     id "fabric-loom" version "1.13.6" apply false
+    id "net.neoforged.moddev" version "2.0.144" apply false
 }
 
 allprojects {
@@ -33,15 +34,20 @@ def isWindows = System.getProperty("os.name").toLowerCase(java.util.Locale.ROOT)
 // Quarantined Band G (MC 26.1.2). Lives in versions/26.1.2/ with its own Gradle 9.4
 // wrapper + Loom 1.15.5 + JDK 25 — incompatible with this composite's Loom 1.13.6
 // so we shell out rather than including it as a subproject.
-tasks.register("build26", Exec) {
-    group = "build"
-    description = "Builds Band G (MC 26.1.x) via its own quarantined wrapper."
-    workingDir = file("versions/26.1.2")
-    def wrapper = file("versions/26.1.2/${isWindows ? 'gradlew.bat' : 'gradlew'}").absolutePath
-    commandLine = isWindows
-            ? ["cmd", "/c", wrapper, "build", "--no-daemon"]
-            : [wrapper, "build", "--no-daemon"]
+def quarantinedBand = { String taskName, String dir, String desc ->
+    tasks.register(taskName, Exec) {
+        group = "build"
+        description = desc
+        workingDir = file("versions/${dir}")
+        def wrapper = file("versions/${dir}/${isWindows ? 'gradlew.bat' : 'gradlew'}").absolutePath
+        commandLine = isWindows
+                ? ["cmd", "/c", wrapper, "build", "--no-daemon"]
+                : [wrapper, "build", "--no-daemon"]
+    }
 }
+
+quarantinedBand("build26", "26.1.2", "Builds Band G (MC 26.1.x, both loaders) via its own quarantined wrapper.")
+quarantinedBand("build262", "26.2", "Builds Band J (MC 26.2.x, both loaders) via its own quarantined wrapper.")
 
 // Bands built inside this composite. Band G is appended from the quarantine below.
 def fabricBands = [
@@ -51,16 +57,35 @@ def fabricBands = [
         "1.21.1-fabric",   // Band C: primary (TBA target)
         "1.21.2-fabric",   // Band D: ContainerEntity#getContainerLootTable rename
         "1.21.4-fabric",   // Band D
-        "1.21.6-fabric",   // Band E: SavedDataType/Codec replaces SavedData.Factory
+        "1.21.5-fabric",   // Band E: SavedDataType/Codec replaces SavedData.Factory (from 1.21.5)
+        "1.21.6-fabric",   // Band E
         "1.21.9-fabric",   // Band E
         "1.21.11-fabric",  // Band F: Identifier rename, vehicle package move
+]
+
+// NeoForge bands. NeoForge has no modern line below 1.20.5 and 1.20.1 is reachable only through
+// the legacy MDG plugin, so Band A stays Fabric-only and Band B targets 1.20.6.
+// NF 21.6, 21.7 and 21.9 have NO stable builds (verified against maven.neoforged.net 2026-08-29 —
+// every 21.6.x and 21.9.x is a -beta), so those MC versions are covered by the 21.8 and 21.10
+// builds instead of getting bands of their own.
+def neoforgeBands = [
+        "1.20.6-neoforge",   // Band B: MC 1.20.6
+        "1.21.1-neoforge",   // Band C: MC 1.21-1.21.1
+        "1.21.3-neoforge",   // Band D: MC 1.21.2-1.21.3
+        "1.21.4-neoforge",   // Band D: MC 1.21.4
+        "1.21.5-neoforge",   // Band E: MC 1.21.5
+        "1.21.8-neoforge",   // Band E: MC 1.21.6-1.21.8
+        "1.21.10-neoforge",  // Band E: MC 1.21.9-1.21.10
+        "1.21.11-neoforge",  // Band F: MC 1.21.11
 ]
 
 tasks.register("buildAll") {
     group = "build"
     description = "Builds every band JAR and collects them into build/release/"
     fabricBands.each { dependsOn ":versions:${it}:build" }
-    dependsOn "build26"                  // Band G: MC 26.1.x (quarantined)
+    neoforgeBands.each { dependsOn ":versions:${it}:build" }
+    dependsOn "build26"                  // Band G: MC 26.1.x (quarantined, both loaders)
+    dependsOn "build262"                 // Band J: MC 26.2.x (quarantined, both loaders)
 
     doLast {
         def releaseDir = layout.buildDirectory.dir("release").get().asFile
@@ -77,11 +102,14 @@ tasks.register("buildAll") {
             }
         }
 
-        fabricBands.each { band ->
+        (fabricBands + neoforgeBands).each { band ->
             collect(project(":versions:${band}").layout.buildDirectory.dir("libs").get().asFile)
         }
-        // Band G lives outside the composite; its JARs sit in versions/26.1.2/build/libs/.
-        collect(file("versions/26.1.2/build/libs"))
+        // Bands G and J live outside the composite; one subproject per loader each.
+        ["26.1.2", "26.2"].each { dir ->
+            collect(file("versions/${dir}/band-fabric/build/libs"))
+            collect(file("versions/${dir}/band-neoforge/build/libs"))
+        }
 
         println "Collected ${releaseDir.listFiles()?.length ?: 0} JARs in ${releaseDir.path}"
     }

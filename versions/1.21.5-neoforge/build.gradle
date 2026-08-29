@@ -1,0 +1,9 @@
+// Band E NeoForge - MC 1.21.5. SavedData.Factory was removed HERE, not at 1.21.6: verified by
+// compiling store-nbt against 1.21.5 and watching it fail. The 1.21.4 JAR does NOT run on 1.21.5.
+plugins {
+    id "net.neoforged.moddev"
+}
+
+ext.slashloot = [ids: "location", vehicle: "container", store: "codec", open: "player", savedtype: "string"]
+
+apply from: "${rootDir}/gradle/neoforge-band.gradle"

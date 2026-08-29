@@ -2,7 +2,65 @@
 
 All notable changes to SlashLootr. Dates are YYYY-MM-DD.
 
-## 0.2.0 — 2026-08-29
+## 0.3.0 — 2026-08-29
+
+**NeoForge support, and coverage out to MC 26.2.** 22 JARs, up from 10.
+
+> 0.2.0 was built and verified but never published, so a 0.3.0 release carries both entries.
+> Publish with the full changelog, not just this section.
+
+### Added
+
+- **NeoForge builds** for MC 1.20.6, 1.21–1.21.1, 1.21.2–1.21.3, 1.21.4, 1.21.5, 1.21.6–1.21.8,
+  1.21.9–1.21.10, 1.21.11, 26.1.2, and 26.2. Same mod, same behaviour, same save data — the shared
+  tree from 0.2.0 is loader-neutral, so NeoForge needed one adapter (`loader-neoforge/`) and per-band
+  build files, and no changes at all to the mod logic or the mixins. NeoForge is Mojang-mapped like
+  our Loom builds, so the mixins apply unchanged with no refmap.
+- **MC 26.2 ("Chaos Cubed")** on both loaders, as a quarantined composite beside 26.1.
+- **MC 1.21.5 on Fabric** — see the fix below.
+
+### Fixed
+
+- **The 1.21.4 JAR was advertised for MC 1.21.5 and would not have run there.** `SavedData.Factory`
+  was removed at **1.21.5**, not 1.21.6 as the 0.1.x metadata assumed; the CompoundTag-based store
+  cannot compile, let alone load, against 1.21.5. Verified by building the store against 1.21.5 and
+  watching it fail. 1.21.5 now has its own band on both loaders, and the 1.21.4 band no longer
+  claims it.
+- **Break cleanup no longer trusts the break event.** NeoForge's break event fires *before* the
+  break and is cancellable, unlike Fabric's `AFTER`; acting on it directly would discard a player's
+  loot for a container another mod then saves. The position now jumps the prune queue and is
+  re-checked on the next tick by the same decision function the rest of the mod uses. The prune
+  queue is also drained regardless of `pruneIntervalTicks`, so break cleanup still lands promptly
+  when the background sweep is disabled.
+
+### Coverage notes
+
+- **NeoForge has no 1.20.1**, which is reachable only through the legacy ModDevGradle plugin, so
+  Band A stays Fabric-only and NeoForge starts at 1.20.6 (there is no NeoForge 1.20.5 line).
+- **NeoForge 21.6, 21.7 and 21.9 have no stable builds** — every published `21.6.x` and `21.9.x` is
+  a `-beta` (verified against `maven.neoforged.net`). Those MC versions are covered by the 21.8 and
+  21.10 builds rather than getting bands of their own.
+
+### Internal
+
+- `loader-neoforge/` mirrors `loader-fabric/`: a `LoaderBridge` implementation plus a `@Mod`
+  entrypoint. Nothing else in the tree names a loader type.
+- One NeoForge-side compat axis was needed: MC 26.1 replaced `BlockEvent.BreakEvent` with
+  `event.level.block.BreakBlockEvent`, isolated in `loader-neoforge/variants/break-*`.
+- The 26.1.2 quarantine became a two-subproject composite (`band-fabric`, `band-neoforge`), and
+  26.2 was forked from it. The root `build26` / `build262` tasks drive them.
+- JARs are `slashlootr-<version>+mc<band>-<loader>.jar`; the publish scripts key their game-version
+  and Java-version maps on `(band, loader)`.
+
+### Runtime verified
+
+- **NeoForge 1.21.1**: booted a real NeoForge server and re-ran the 0.2.0 sweep — instanced
+  container keeps its loot table, blacklisted table falls back to real vanilla loot, and a
+  loot-table hopper (an unsupported container) falls back too. Commands, config reload, and
+  decision logging all behave identically to Fabric. No mixin warnings on boot.
+- All 22 band/loader combinations compile clean.
+
+## 0.2.0 — 2026-08-29 (not published; folded into 0.3.0)
 
 Compatibility release, driven by modpack-author feedback on the CurseForge page.
 

@@ -6,6 +6,8 @@ Every player who opens a naturally-generated container gets their own personal c
 
 > **v0.1.1 — running in production** on The Block Survival, our Minecraft 26.1.2 vanilla-friendly survival server. Deployed entirely server-side; players didn't have to update or install anything.
 
+**Fabric and NeoForge.**
+
 ## Server-side only — players install nothing
 
 SlashLoot runs entirely on the server. Players connect with plain vanilla Fabric: they don't install the mod, and they don't have to update when you do. SlashLoot never replaces the block or its block-state, so the container always stays a real `minecraft:chest` (or barrel, shulker, minecart, etc.). Datapack predicates, `/data` queries, scoreboard selectors, and structure saves keep seeing ordinary vanilla blocks.

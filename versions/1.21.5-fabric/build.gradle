@@ -1,0 +1,9 @@
+// Band E - MC 1.21.5. SavedData.Factory was removed HERE, not at 1.21.6, so this cannot share the
+// 1.21.4 band's JAR the way the publish metadata used to claim.
+plugins {
+    id "fabric-loom"
+}
+
+ext.slashloot = [ids: "location", vehicle: "container", store: "codec", open: "player", savedtype: "string"]
+
+apply from: "${rootDir}/gradle/fabric-band.gradle"

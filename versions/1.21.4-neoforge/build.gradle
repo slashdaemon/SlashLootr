@@ -1,0 +1,8 @@
+// Band D NeoForge - MC 1.21.4
+plugins {
+    id "net.neoforged.moddev"
+}
+
+ext.slashloot = [ids: "location", vehicle: "container", store: "nbt", open: "player"]
+
+apply from: "${rootDir}/gradle/neoforge-band.gradle"

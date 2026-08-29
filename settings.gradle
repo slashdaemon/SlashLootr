@@ -22,9 +22,21 @@ include "versions:1.21-fabric"      // Band C: MC 1.21
 include "versions:1.21.1-fabric"    // Band C: MC 1.21.1        (primary / TBA target)
 include "versions:1.21.2-fabric"    // Band D: MC 1.21.2-1.21.3
 include "versions:1.21.4-fabric"    // Band D: MC 1.21.4-1.21.5
+include "versions:1.21.5-fabric"    // Band E: MC 1.21.5 (SavedData.Factory already gone here)
 include "versions:1.21.6-fabric"    // Band E: MC 1.21.6-1.21.8
 include "versions:1.21.9-fabric"    // Band E: MC 1.21.9-1.21.10
 include "versions:1.21.11-fabric"   // Band F: MC 1.21.11
+
+// NeoForge bands. NeoForge has no modern line below 1.20.5, and 1.20.1 is reachable only
+// through the legacy MDG plugin, so Band A stays Fabric-only and Band B targets 1.20.6.
+include "versions:1.20.6-neoforge"  // Band B NeoForge: MC 1.20.6      (NF 20.6.x)
+include "versions:1.21.1-neoforge"  // Band C NeoForge: MC 1.21-1.21.1  (NF 21.1.x)
+include "versions:1.21.3-neoforge"  // Band D NeoForge: MC 1.21.2-1.21.3 (NF 21.3.x)
+include "versions:1.21.4-neoforge"  // Band D NeoForge: MC 1.21.4        (NF 21.4.x)
+include "versions:1.21.5-neoforge"  // Band D NeoForge: MC 1.21.5        (NF 21.5.x)
+include "versions:1.21.8-neoforge"  // Band E NeoForge: MC 1.21.6-1.21.8 (NF 21.6/21.7 are BETA-ONLY; built on 21.8)
+include "versions:1.21.10-neoforge" // Band E NeoForge: MC 1.21.9-1.21.10 (NF 21.9 is BETA-ONLY; built on 21.10)
+include "versions:1.21.11-neoforge" // Band F NeoForge: MC 1.21.11       (NF 21.11.x)
 
 // Band G (MC 26.1.x) is a quarantined composite under versions/26.1.2/ with its own Gradle 9.4
 // wrapper, Loom 1.15.5 and JDK 25. The root build shells out to it via the build26 task.

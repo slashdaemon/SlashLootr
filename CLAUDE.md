@@ -1,6 +1,6 @@
 # CLAUDE.md — SlashLootr
 
-Server-side per-player loot mod, published as **SlashLoot**. **No custom blocks.** **No client install required.** Vanilla-compatible alternative to [Lootr](https://github.com/LootrMinecraft/Lootr).
+Server-side per-player loot mod, published as **SlashLoot**. **Fabric + NeoForge.** **No custom blocks.** **No client install required.** Vanilla-compatible alternative to [Lootr](https://github.com/LootrMinecraft/Lootr).
 
 ## Why this exists
 
@@ -31,14 +31,16 @@ side-effect free and must never force-load a chunk.
 
 ## Build
 
-Java 21 for bands A–F (Java 17 target for Band A); Band G (26.1.x) needs JDK 25 via its own wrapper.
+Java 21 for the 1.20.x–1.21.x bands (Java 17 target for Band A). Bands G and J (26.x) need JDK 25 via their own wrappers.
 
 ```bash
 export JAVA_HOME="/c/Users/slash/AppData/Roaming/PrismLauncher/java/java-runtime-delta"
 export PATH="$JAVA_HOME/bin:$PATH"
-./gradlew buildAll                      # all bands → build/release/
-./gradlew :versions:1.21.1-fabric:build # single band
-./gradlew build26                       # quarantined Band G only
+./gradlew buildAll                        # all 22 band/loader JARs → build/release/
+./gradlew :versions:1.21.1-fabric:build   # single Fabric band
+./gradlew :versions:1.21.1-neoforge:build # single NeoForge band
+./gradlew build26                         # quarantined Band G (26.1.x, both loaders)
+./gradlew build262                        # quarantined Band J (26.2.x, both loaders)
 ```
 
 Verify Prism's JDK still aliases as `java-runtime-delta` (Prism rotates these — check `ls ~/AppData/Roaming/PrismLauncher/java/` if Gradle complains about the toolchain).
@@ -64,24 +66,32 @@ SlashLootr/
 │       ├── store/PlayerLootEntry.java
 │       └── mixin/{MixinRandomizableContainer,MixinContainerEntity,MixinEntityRemoved}.java
 ├── compat/                     per-generation seams, a few dozen lines each
-│   ├── ids-location/           B–E   ResourceKey#location(), hasPermission(2)
-│   ├── ids-identifier/         F–G   ResourceKey#identifier(), Commands.hasPermission
-│   ├── vehicle-legacy/         B–C   ContainerEntity#getLootTable
-│   ├── vehicle-container/      D–E   #getContainerLootTable
-│   ├── vehicle-moved/          F–G   + vehicle.minecart / vehicle.boat packages
-│   ├── store-nbt/              B–D   SavedData.Factory + CompoundTag
-│   ├── store-codec/            E–G   SavedDataType + Codec
-│   ├── savedtype-string/       E–F   SavedDataType(String, …)
-│   ├── savedtype-id/           G     SavedDataType(Identifier, …)
-│   ├── open-player/            B–E   Container#startOpen(Player)
-│   └── open-containeruser/     F–G   Container#startOpen(ContainerUser)
-├── loader-fabric/              FabricBridge + entrypoint + fabric.mod.json + mixins.json
-├── gradle/fabric-band.gradle   composes the above from each band's variant list
+│   ├── ids-location/           ≤1.21.10  ResourceKey#location(), hasPermission(2)
+│   ├── ids-identifier/         ≥1.21.11  ResourceKey#identifier(), Commands.hasPermission
+│   ├── vehicle-legacy/         ≤1.21.1   ContainerEntity#getLootTable
+│   ├── vehicle-container/      1.21.2+   #getContainerLootTable
+│   ├── vehicle-moved/          ≥1.21.11  + vehicle.minecart / vehicle.boat packages
+│   ├── store-nbt/              ≤1.21.4   SavedData.Factory + CompoundTag
+│   ├── store-codec/            ≥1.21.5   SavedDataType + Codec
+│   ├── savedtype-string/       ≤1.21.11  SavedDataType(String, …)
+│   ├── savedtype-id/           ≥26.1     SavedDataType(Identifier, …)
+│   ├── open-player/            ≤1.21.8   Container#startOpen(Player)
+│   └── open-containeruser/     ≥1.21.9   Container#startOpen(ContainerUser)
+├── loader-fabric/              FabricBridge + entrypoint + fabric.mod.json
+├── loader-neoforge/            NeoForgeBridge + @Mod entrypoint + neoforge.mods.toml
+│   └── variants/break-*/       NeoForge-only axis: BreakEvent moved at 26.1
+├── gradle/fabric-band.gradle   composes a Fabric band from each band's variant list
+├── gradle/neoforge-band.gradle same, for NeoForge
 └── versions/
     ├── 1.20.1-fabric/          Band A — SELF-CONTAINED FORK (see below)
-    ├── <band>-fabric/          build.gradle + gradle.properties only
-    └── 26.1.2/                 Band G — quarantined composite (own wrapper, JDK 25)
+    ├── <band>-<loader>/        build.gradle + gradle.properties only
+    ├── 26.1.2/                 Band G — quarantined composite, band-fabric + band-neoforge
+    └── 26.2/                   Band J — same shape, forked from 26.1.2
 ```
+
+`mc-src/` names no loader type. The single seam is `loader/LoaderBridge` — five hooks (use-block,
+use-entity, register-commands, block-break, server-tick) plus the config directory — which each
+loader entrypoint implements and hands to `SlashLootrCore.boot(...)`.
 
 A band's whole build file is its variant list:
 
@@ -102,33 +112,65 @@ the same contract and the same reason strings, so the port is mechanical.
 
 ## Currently shipping
 
-10 JARs, all via `./gradlew buildAll`. Artifacts are `slashlootr-<ver>+mc<band>-<loader>.jar`.
+22 JARs (12 Fabric + 10 NeoForge), all via `./gradlew buildAll`. Artifacts are
+`slashlootr-<ver>+mc<band>-<loader>.jar`.
 
-| Band | MC | ids | vehicle | store | savedtype | open |
-| ---- | -- | --- | ------- | ----- | --------- | ---- |
-| A | 1.20.1 | *(fork — Java 17)* | | | | |
-| B | 1.20.5–1.20.6 | location | legacy | nbt | — | player |
-| C | 1.21, 1.21.1 | location | legacy | nbt | — | player |
-| D | 1.21.2, 1.21.4 | location | container | nbt | — | player |
-| E | 1.21.6 | location | container | codec | string | player |
-| E | 1.21.9 | location | container | codec | string | containeruser |
-| F | 1.21.11 | identifier | moved | codec | string | containeruser |
-| G | 26.1.2 | identifier | moved | codec | id | containeruser |
+**NeoForge coverage differs from Fabric, for reasons outside our control:**
 
-Where each split lands: `getContainerLootTable` at **1.21.2**; `SavedDataType`+`Codec` at **1.21.6**;
-`startOpen(ContainerUser)` at **1.21.9**; `Identifier` + vehicle package move at **1.21.11**;
-`SavedDataType(Identifier)` at **26.1**.
+- NeoForge has no 1.20.1 outside the legacy MDG plugin, and no 1.20.5 line, so it starts at 1.20.6.
+- NeoForge 21.6, 21.7 and 21.9 have **no stable builds at all** — every published `21.6.x` /
+  `21.9.x` is a `-beta` (checked against `maven.neoforged.net`). MC 1.21.6–1.21.8 ride the 21.8
+  build, and 1.21.9–1.21.10 ride the 21.10 build.
+- **1.21.5 is its own band on both loaders.** `SavedData.Factory` was removed at 1.21.5, not 1.21.6
+  — the 1.21.4 JAR cannot run there, though 0.1.x advertised it for exactly that.
+
+| Band dir | Loader | MC covered | ids | vehicle | store | savedtype | open |
+| -------- | ------ | ---------- | --- | ------- | ----- | --------- | ---- |
+| 1.20.1-fabric | F | 1.20.1 | *(fork — Java 17)* | | | | |
+| 1.20.5-fabric | F | 1.20.5–1.20.6 | location | legacy | nbt | — | player |
+| 1.20.6-neoforge | N | 1.20.6 | location | legacy | nbt | — | player |
+| 1.21-fabric | F | 1.21 | location | legacy | nbt | — | player |
+| 1.21.1-fabric | F | 1.21.1 | location | legacy | nbt | — | player |
+| 1.21.1-neoforge | N | 1.21–1.21.1 | location | legacy | nbt | — | player |
+| 1.21.2-fabric | F | 1.21.2–1.21.3 | location | container | nbt | — | player |
+| 1.21.3-neoforge | N | 1.21.2–1.21.3 | location | container | nbt | — | player |
+| 1.21.4-fabric / -neoforge | F+N | 1.21.4 | location | container | nbt | — | player |
+| 1.21.5-fabric / -neoforge | F+N | 1.21.5 | location | container | codec | string | player |
+| 1.21.6-fabric | F | 1.21.6–1.21.8 | location | container | codec | string | player |
+| 1.21.8-neoforge | N | 1.21.6–1.21.8 | location | container | codec | string | player |
+| 1.21.9-fabric | F | 1.21.9–1.21.10 | location | container | codec | string | containeruser |
+| 1.21.10-neoforge | N | 1.21.9–1.21.10 | location | container | codec | string | containeruser |
+| 1.21.11-fabric / -neoforge | F+N | 1.21.11 | identifier | moved | codec | string | containeruser |
+| 26.1.2 (both) | F+N | 26.1.2 | identifier | moved | codec | id | containeruser |
+| 26.2 (both) | F+N | 26.2 | identifier | moved | codec | id | containeruser |
+
+Where each split lands: `getContainerLootTable` at **1.21.2**; `SavedDataType`+`Codec` at
+**1.21.5**; `startOpen(ContainerUser)` at **1.21.9**; `Identifier` + vehicle package move at
+**1.21.11**; `SavedDataType(Identifier)` at **26.1**. NeoForge adds one axis of its own:
+`BlockEvent.BreakEvent` became `event.level.block.BreakBlockEvent` at **26.1** (`nfbreak`).
 
 ## Adding a new band
 
-1. `include "versions:<MC>-fabric"` in `settings.gradle` and add it to `fabricBands` in the root `build.gradle`.
-2. Create `versions/<MC>-fabric/gradle.properties` (`minecraft_version`, `fabric_api_version`; add `java_version` / `mixin_compat` only if it is not JDK 21).
-3. Create `versions/<MC>-fabric/build.gradle` with the four-key variant list above — pick the row from the table whose splits the new version is on.
-4. Build. **If it compiles, you are done.** If it does not, the compiler is telling you a new drift axis appeared: add a `compat/<axis>-<variant>/` directory holding only the differing calls, add the key to `gradle/fabric-band.gradle`, and set it on every band. Do not fork the whole tree.
+1. `include "versions:<MC>-<loader>"` in `settings.gradle` and add it to `fabricBands` or
+   `neoforgeBands` in the root `build.gradle`.
+2. Create `versions/<MC>-<loader>/gradle.properties`. Fabric: `minecraft_version`,
+   `fabric_api_version`. NeoForge: `minecraft_version`, `neoforge_version`, plus the
+   `neoforge_range` / `minecraft_range` Maven Version Ranges that go into `neoforge.mods.toml`.
+   Add `java_version` / `mixin_compat` only if the band is not on JDK 21.
+3. Create `versions/<MC>-<loader>/build.gradle` with the variant list, applying
+   `gradle/fabric-band.gradle` or `gradle/neoforge-band.gradle` — pick the row from the table above
+   whose splits the new version is on.
+4. Build. **If it compiles, you are done.** If it does not, the compiler is telling you a new drift
+   axis appeared: add a `compat/<axis>-<variant>/` directory (or, for a loader-only difference,
+   `loader-neoforge/variants/<axis>-<variant>/`) holding only the differing calls, add the key to
+   the composer, and set it on every band. Do not fork the whole tree.
+
+**Before pinning a NeoForge version, check `maven.neoforged.net` rather than a table.** Several
+widely-circulated matrices claim stable NeoForge exists for 21.6 / 21.9; it does not.
 
 ## Verification
 
-**Build gate:** `./gradlew buildAll` must collect the expected JAR count into `build/release/`.
+**Build gate:** `./gradlew buildAll` must collect 22 JARs into `build/release/`.
 
 **Headless functional pass** (no client needed — a hopper under a container triggers
 `unpackLootTable`, which is the exact path the mixins hook). Boot a bare Fabric server with the
@@ -144,6 +186,10 @@ data get block <p>          # instanced: LootTable tag SURVIVES, hopper stays em
 Cover: chest (instanced), chest with its table in `lootTableBlocklist` (must fall back to vanilla),
 `minecraft:hopper` with a loot table (unsupported container — must fall back to vanilla), barrel,
 chest minecart. Set `debugLogging: true` and check each verdict line reads correctly.
+
+On NeoForge the same sweep runs through ModDevGradle's generated server, which needs no separate
+install — `./gradlew :versions:1.21.1-neoforge:runServer`, with `run/eula.txt` and
+`run/server.properties` (RCON on) created first.
 
 **Client pass** (needs two players; LocalServer at `C:\Users\slash\Projects\LocalServer\`):
 

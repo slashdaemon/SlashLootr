@@ -6,6 +6,8 @@ Every player who opens a naturally-generated container gets their own personal c
 
 Containers you place yourself are never touched — chests, barrels, and shulker boxes you build behave exactly like vanilla.
 
+**Fabric and NeoForge.**
+
 ## Server-side only — players install nothing
 
 SlashLoot runs entirely on the server. Players connect with plain vanilla Fabric: they don't install the mod, and they don't have to update when you do. SlashLoot never replaces the block or its block-state, so the container always stays a real `minecraft:chest` (or barrel, shulker, minecart, etc.). Datapack predicates, `/data` queries, scoreboard selectors, and structure saves keep seeing ordinary vanilla blocks.
@@ -39,7 +41,9 @@ That's it. Clients connect with vanilla Fabric — nothing to install on their e
 
 ## Supported versions
 
-Pick the JAR that matches your server's Minecraft version, and use the listed Fabric API build.
+Pick the JAR matching your server's Minecraft version **and loader** — files are named `slashlootr-<version>+mc<band>-<loader>.jar`. Fabric builds need Fabric API at the listed version; NeoForge builds need nothing beyond NeoForge.
+
+NeoForge coverage differs slightly: NeoForge has no 1.20.1 or 1.20.5 line, and no stable 21.6 / 21.7 / 21.9 builds, so MC 1.21.6-1.21.8 and 1.21.9-1.21.10 are covered by the 21.8 and 21.10 builds.
 
 | Minecraft | Fabric API      |
 | --------- | --------------- |

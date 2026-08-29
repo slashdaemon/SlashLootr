@@ -66,34 +66,58 @@ CURSEFORGE_API = "https://minecraft.curseforge.com/api"
 # the version named in its directory; the band can additionally claim adjacent
 # versions that share the same vanilla API surface. See docs/ARCHITECTURE.md
 # § Per-band specifics for what bands actually cover.
+# Keyed by (mc_band, loader) because the two loaders do not cover the same MC versions:
+# NeoForge has no line below 1.20.5, and NF 21.6 / 21.7 / 21.9 have no stable builds at all
+# (every published 21.6.x / 21.9.x is a -beta), so those MC versions ride the 21.8 and 21.10 JARs.
+#
+# NOTE: 1.21.4 does NOT cover 1.21.5. SavedData.Factory was removed at 1.21.5, not 1.21.6 as
+# earlier metadata assumed — verified by compiling the CompoundTag store against 1.21.5 and
+# watching it fail. 0.1.x advertised the 1.21.4 JAR for 1.21.5; it would not have run there.
+# 1.21.5 now has its own band on both loaders.
 BAND_GAME_VERSIONS = {
-    "1.20.1":  ["1.20.1"],
-    "1.20.5":  ["1.20.5", "1.20.6"],
-    "1.21":    ["1.21"],
-    "1.21.1":  ["1.21.1"],
-    "1.21.2":  ["1.21.2", "1.21.3"],
-    "1.21.4":  ["1.21.4", "1.21.5"],
-    "1.21.6":  ["1.21.6", "1.21.7", "1.21.8"],
-    "1.21.9":  ["1.21.9", "1.21.10"],
-    "1.21.11": ["1.21.11"],
-    "26.1.2":  ["26.1.2"],
+    ("1.20.1",  "fabric"):   ["1.20.1"],
+    ("1.20.5",  "fabric"):   ["1.20.5", "1.20.6"],
+    ("1.21",    "fabric"):   ["1.21"],
+    ("1.21.1",  "fabric"):   ["1.21.1"],
+    ("1.21.2",  "fabric"):   ["1.21.2", "1.21.3"],
+    ("1.21.4",  "fabric"):   ["1.21.4"],
+    ("1.21.5",  "fabric"):   ["1.21.5"],
+    ("1.21.6",  "fabric"):   ["1.21.6", "1.21.7", "1.21.8"],
+    ("1.21.9",  "fabric"):   ["1.21.9", "1.21.10"],
+    ("1.21.11", "fabric"):   ["1.21.11"],
+    ("26.1.2",  "fabric"):   ["26.1.2"],
+    ("26.2",    "fabric"):   ["26.2"],
+
+    ("1.20.6",  "neoforge"): ["1.20.6"],
+    ("1.21.1",  "neoforge"): ["1.21", "1.21.1"],
+    ("1.21.3",  "neoforge"): ["1.21.2", "1.21.3"],
+    ("1.21.4",  "neoforge"): ["1.21.4"],
+    ("1.21.5",  "neoforge"): ["1.21.5"],
+    ("1.21.8",  "neoforge"): ["1.21.6", "1.21.7", "1.21.8"],
+    ("1.21.10", "neoforge"): ["1.21.9", "1.21.10"],
+    ("1.21.11", "neoforge"): ["1.21.11"],
+    ("26.1.2",  "neoforge"): ["26.1.2"],
+    ("26.2",    "neoforge"): ["26.2"],
 }
+
+
+def game_versions_for(band: str, loader: str) -> list[str]:
+    """MC versions a given (band, loader) JAR is advertised for."""
+    return BAND_GAME_VERSIONS.get((band, loader), [band])
 
 # Per-band Java version. Band A (1.20.1) needs JDK 17; 1.20.5–1.21.11 use JDK 21.
 # Band G (26.1.2) compiles with JDK 25 but we tag "Java 21" since CF doesn't yet
 # recognize "Java 25" in its catalog (matches StreamCraft's 26.1 convention).
+# Band A (1.20.1) needs JDK 17; everything else is JDK 21. Bands G/J (26.x) compile with JDK 25
+# but are tagged "Java 21" because CF does not yet carry "Java 25" (matches StreamCraft's
+# 26.1 convention).
 BAND_JAVA_VERSION = {
-    "1.20.1":  "Java 17",
-    "1.20.5":  "Java 21",
-    "1.21":    "Java 21",
-    "1.21.1":  "Java 21",
-    "1.21.2":  "Java 21",
-    "1.21.4":  "Java 21",
-    "1.21.6":  "Java 21",
-    "1.21.9":  "Java 21",
-    "1.21.11": "Java 21",
-    "26.1.2":  "Java 21",
+    "1.20.1": "Java 17",
 }
+
+
+def java_version_for(band: str) -> str:
+    return BAND_JAVA_VERSION.get(band, "Java 21")
 
 
 def parse_filename(jar_path: Path) -> tuple[str, str, str]:
@@ -401,8 +425,8 @@ def main() -> int:
     for band, loader in sorted(found):
         jar = found[(band, loader)]
         loader_name = "NeoForge" if loader == "neoforge" else "Fabric"
-        mc_versions = BAND_GAME_VERSIONS.get(band, [band])
-        java_version = BAND_JAVA_VERSION.get(band, "Java 21")
+        mc_versions = game_versions_for(band, loader)
+        java_version = java_version_for(band)
         if catalog:
             game_version_ids = resolve_game_version_ids(
                 catalog, type_ids, mc_versions, java_version, band, loader_name)

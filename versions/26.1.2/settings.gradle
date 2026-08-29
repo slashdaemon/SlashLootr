@@ -1,6 +1,7 @@
 pluginManagement {
     repositories {
         maven { name = 'Fabric'; url = 'https://maven.fabricmc.net/' }
+        maven { name = 'NeoForged'; url = 'https://maven.neoforged.net/releases' }
         gradlePluginPortal()
         mavenCentral()
     }
@@ -12,3 +13,6 @@ plugins {
 }
 
 rootProject.name = 'slashlootr-26'
+
+include 'band-fabric'
+include 'band-neoforge'
