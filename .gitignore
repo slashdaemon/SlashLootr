@@ -21,3 +21,7 @@ run/
 venv/
 __pycache__/
 *.pyc
+
+# Publish run logs (keep the full fileID list locally; never commit)
+publish-*.log
+cf-fileids-*.txt

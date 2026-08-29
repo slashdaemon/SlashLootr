@@ -120,6 +120,12 @@ def java_version_for(band: str) -> str:
     return BAND_JAVA_VERSION.get(band, "Java 21")
 
 
+# CurseForge requires at least one tag from its "Environment" version group, or the upload is
+# rejected with errorCode 1021. SlashLoot is server-side only (fabric.mod.json declares
+# environment=server, and clients connect unmodified), so every file is tagged Server.
+CURSEFORGE_ENVIRONMENT = "Server"
+
+
 def parse_filename(jar_path: Path) -> tuple[str, str, str]:
     """
     Parse a JAR filename into (mod_version, mc_band, loader).
@@ -216,7 +222,10 @@ def expected_type_slug(name: str) -> str | None:
       "Fabric"  -> "modloader"
       "NeoForge"-> "modloader"
       "Java 21" -> "java"
+      "Server"  -> "environment"
     """
+    if name in ("Client", "Server"):
+        return "environment"
     if name in ("Fabric", "NeoForge"):
         return "modloader"
     if name.startswith("Java "):
@@ -237,7 +246,7 @@ def resolve_game_version_ids(
     loader_name: str,
 ) -> list[int]:
     """Build the gameVersions int-ID array CurseForge expects."""
-    requested = [*mc_versions, loader_name, java_version]
+    requested = [*mc_versions, loader_name, java_version, CURSEFORGE_ENVIRONMENT]
     ids: list[int] = []
     missing: list[str] = []
     for name in requested:
