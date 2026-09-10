@@ -124,6 +124,7 @@ public final class Handling {
             }
             return ContainerKind.CHEST;
         }
+        if (ThirdPartyContainers.isRecognizedChest(state)) return ContainerKind.CHEST;
         return null;
     }
 

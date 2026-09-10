@@ -2,6 +2,26 @@
 
 All notable changes to SlashLootr. Dates are YYYY-MM-DD.
 
+## 0.3.2 — 2026-09-09
+
+**Cobblemon's Gilded Chests are now real per-player containers.** Reported issue: Cobblemon's
+Gilded Chest blocks weren't recognized, so players got shared vanilla loot instead of personal
+copies, consumed on first open like any unrecognized container.
+
+- **All seven real Gilded Chest colors are recognized** (`gilded_chest`, and the blue/black/yellow/
+  white/green/pink variants) and served the same as a vanilla chest — 27 slots, lock/rename/pruning
+  support all apply automatically since Cobblemon's chest already extends the same vanilla base
+  class ours does.
+- **The Gimmighoul Chest (the Pokémon mimic) is deliberately left alone.** It shares Cobblemon's
+  chest code internally but isn't a real container — recognizing it would have let SlashLoot's
+  block-click handler steal the interaction before Cobblemon's own mimic-reveal logic ever runs.
+  Matched by block id, not by type, specifically so this one is never included.
+- **Side effect worth knowing:** opening a real Gilded Chest now also counts toward the vanilla
+  "Open Chest" stat and can anger nearby piglins, exactly like a vanilla chest would — this is
+  intentional, not a bug.
+- Any other modded container can still be recognized broadly via the existing
+  `handleUnknownContainers` config option, or excluded per-loot-table via `lootTableBlocklist`.
+
 ## 0.3.1 — 2026-09-09
 
 **Vanilla containers stay vanilla containers, even locked ones.** Follow-up fixes from
