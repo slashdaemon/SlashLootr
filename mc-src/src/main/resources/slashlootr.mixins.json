@@ -5,7 +5,8 @@
   "mixins": [
     "MixinRandomizableContainer",
     "MixinContainerEntity",
-    "MixinEntityRemoved"
+    "MixinEntityRemoved",
+    "AccessorShulkerBoxBlock"
   ],
   "client": [],
   "injectors": {

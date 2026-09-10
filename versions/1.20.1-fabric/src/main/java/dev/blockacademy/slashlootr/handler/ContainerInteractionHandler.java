@@ -6,21 +6,26 @@ import dev.blockacademy.slashlootr.core.Handling;
 import dev.blockacademy.slashlootr.core.LootContainer;
 import dev.blockacademy.slashlootr.core.LootRoller;
 import dev.blockacademy.slashlootr.core.OpenSoundFx;
+import dev.blockacademy.slashlootr.mixin.AccessorShulkerBoxBlock;
 import dev.blockacademy.slashlootr.store.PlayerLootEntry;
 import dev.blockacademy.slashlootr.store.SlashLootrState;
 import net.fabricmc.fabric.api.event.player.UseBlockCallback;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.stats.Stats;
 import net.minecraft.world.CompoundContainer;
 import net.minecraft.world.Container;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
+import net.minecraft.world.entity.monster.piglin.PiglinAi;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.ChestBlock;
+import net.minecraft.world.level.block.entity.BaseContainerBlockEntity;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.entity.ChestBlockEntity;
 import net.minecraft.world.level.block.entity.RandomizableContainerBlockEntity;
@@ -55,16 +60,26 @@ public class ContainerInteractionHandler implements UseBlockCallback {
 
         // Player-dependent gates. Vanilla refuses to open in these cases too, so passing here can
         // never leave a container unrolled.
-        if (be instanceof ShulkerBoxBlockEntity sbe && !sbe.canOpen(sp)) return InteractionResult.PASS;
+        //
+        // canOpen(Player) is BaseContainerBlockEntity's Lock-NBT check — ChestBlockEntity,
+        // BarrelBlockEntity and ShulkerBoxBlockEntity all extend it, so this covers every lockable
+        // kind. It is NOT the shulker obstruction check (a different, static method on the Block),
+        // which is checked separately below.
+        if (be instanceof BaseContainerBlockEntity bcbe && !bcbe.canOpen(sp)) return InteractionResult.PASS;
         if (be instanceof ChestBlockEntity && ChestBlock.isChestBlockedAt(level, pos)) {
             return InteractionResult.PASS;
         }
-
         BlockState state = level.getBlockState(pos);
-        Container backing = buildPerPlayerContainer(level, pos, state, be, sp, decision);
-        if (backing == null) return InteractionResult.PASS;
+        if (be instanceof ShulkerBoxBlockEntity sbe
+                && !AccessorShulkerBoxBlock.slashlootr$canOpen(state, level, pos, sbe)) {
+            return InteractionResult.PASS;
+        }
 
-        sp.openMenu(decision.kind().menuProvider(backing));
+        Built built = buildPerPlayerContainer(level, pos, state, be, sp, decision);
+        if (built == null) return InteractionResult.PASS;
+
+        sp.openMenu(decision.kind().menuProvider(built.container(), built.title()));
+        awardVanillaOpenEffects(sp, decision.kind());
 
         // With delegation on, vanilla's ContainerOpenersCounter already played the open sound.
         SlashLootrConfig config = SlashLootrConfig.get();
@@ -74,7 +89,24 @@ public class ContainerInteractionHandler implements UseBlockCallback {
         return InteractionResult.SUCCESS;
     }
 
-    private static Container buildPerPlayerContainer(
+    /**
+     * Vanilla awards these from inside {@code ChestBlock}/{@code BarrelBlock}/{@code ShulkerBoxBlock}
+     * {@code use()}, which SlashLoot's handler replaces entirely — so they have to be reproduced here,
+     * or a guarded container never angers nearby piglins and the stats never advance.
+     */
+    private static void awardVanillaOpenEffects(ServerPlayer player, ContainerKind kind) {
+        switch (kind) {
+            case CHEST, DOUBLE_CHEST -> player.awardStat(Stats.OPEN_CHEST);
+            case BARREL -> player.awardStat(Stats.OPEN_BARREL);
+            case SHULKER -> player.awardStat(Stats.OPEN_SHULKER_BOX);
+            default -> { return; }
+        }
+        PiglinAi.angerNearbyPiglins(player, true);
+    }
+
+    private record Built(Container container, Component title) {}
+
+    private static Built buildPerPlayerContainer(
             ServerLevel level,
             BlockPos pos,
             BlockState state,
@@ -86,7 +118,8 @@ public class ContainerInteractionHandler implements UseBlockCallback {
         boolean delegate = SlashLootrConfig.get().delegateContainerAnimation;
 
         if (decision.kind() != ContainerKind.DOUBLE_CHEST) {
-            return getOrRoll(store, level, pos, be, sp, decision.slots(), delegate);
+            LootContainer c = getOrRoll(store, level, pos, be, sp, decision.slots(), delegate);
+            return new Built(c, titleOf(be, decision.kind()));
         }
 
         Direction connected = ChestBlock.getConnectedDirection(state);
@@ -94,7 +127,8 @@ public class ContainerInteractionHandler implements UseBlockCallback {
         BlockEntity otherBe = level.getBlockEntity(otherPos);
         if (!(otherBe instanceof ChestBlockEntity) || !(otherBe instanceof RandomizableContainerBlockEntity)) {
             int half = Math.max(1, decision.slots() / 2);
-            return getOrRoll(store, level, pos, be, sp, half, delegate);
+            LootContainer c = getOrRoll(store, level, pos, be, sp, half, delegate);
+            return new Built(c, titleOf(be, decision.kind()));
         }
 
         // Canonical ordering so the two halves never swap between openings.
@@ -108,7 +142,12 @@ public class ContainerInteractionHandler implements UseBlockCallback {
 
         LootContainer firstC = getOrRoll(store, level, first, firstBe, sp, firstSlots, delegate);
         LootContainer secondC = getOrRoll(store, level, second, secondBe, sp, secondSlots, delegate);
-        return new CompoundContainer(firstC, secondC);
+        // Matches vanilla: the merged menu takes its title from one canonical half, not both.
+        return new Built(new CompoundContainer(firstC, secondC), titleOf(firstBe, decision.kind()));
+    }
+
+    private static Component titleOf(BlockEntity be, ContainerKind kind) {
+        return be instanceof BaseContainerBlockEntity bcbe ? bcbe.getDisplayName() : kind.defaultTitle();
     }
 
     private static LootContainer getOrRoll(
@@ -133,6 +172,8 @@ public class ContainerInteractionHandler implements UseBlockCallback {
         }
         // Point the animation at the real world container for this session only.
         existing.delegateTo(delegate && be instanceof Container c ? c : null);
+        // Distance/validity tracking always applies, independent of the animation-delegation setting.
+        existing.trackOrigin(level, pos);
         return existing;
     }
 }

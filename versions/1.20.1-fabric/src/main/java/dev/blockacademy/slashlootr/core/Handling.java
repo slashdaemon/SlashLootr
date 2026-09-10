@@ -102,6 +102,19 @@ public final class Handling {
         return d.instanced();
     }
 
+    /**
+     * Structural-only presence check for {@code CleanupHandler}: is there still a container here that
+     * SlashLoot could have instanced, ignoring every config gate ({@code enabled}, blocklists)?
+     *
+     * <p>Deliberately narrower than {@link #forBlock}. A blocklist edit or a temporary {@code enabled:
+     * false} makes {@code forBlock} return {@code VANILLA} for a container that is still sitting there
+     * with a player's loot in it — pruning on that verdict would delete live per-player data for no
+     * reason but a config toggle. This only says yes once the container itself is actually gone.
+     */
+    public static boolean stillPhysicallyPresent(Level level, BlockPos pos, BlockEntity be) {
+        return be instanceof RandomizableContainerBlockEntity && lootTableOf(be) != null;
+    }
+
     private static ContainerKind classifyBlock(BlockEntity be, BlockState state) {
         if (be instanceof ShulkerBoxBlockEntity) return ContainerKind.SHULKER;
         if (be instanceof BarrelBlockEntity) return ContainerKind.BARREL;

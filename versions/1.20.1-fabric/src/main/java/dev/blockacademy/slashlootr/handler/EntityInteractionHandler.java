@@ -6,6 +6,7 @@ import dev.blockacademy.slashlootr.core.LootRoller;
 import dev.blockacademy.slashlootr.store.PlayerLootEntry;
 import dev.blockacademy.slashlootr.store.SlashLootrState;
 import net.fabricmc.fabric.api.event.player.UseEntityCallback;
+import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -55,8 +56,10 @@ public class EntityInteractionHandler implements UseEntityCallback {
             entry.put(sp.getUUID(), container);
             store.setDirty();
         }
+        container.trackOrigin(entity);
 
-        sp.openMenu(decision.kind().menuProvider(container));
+        Component title = entity.hasCustomName() ? entity.getDisplayName() : decision.kind().defaultTitle();
+        sp.openMenu(decision.kind().menuProvider(container, title));
         return InteractionResult.SUCCESS;
     }
 }

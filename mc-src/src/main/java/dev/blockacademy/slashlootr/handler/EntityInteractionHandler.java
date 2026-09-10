@@ -6,6 +6,7 @@ import dev.blockacademy.slashlootr.core.LootContainer;
 import dev.blockacademy.slashlootr.core.LootRoller;
 import dev.blockacademy.slashlootr.store.PlayerLootEntry;
 import dev.blockacademy.slashlootr.store.SlashLootrState;
+import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -52,8 +53,10 @@ public final class EntityInteractionHandler {
             entry.put(player.getUUID(), container);
             store.setDirty();
         }
+        container.trackOrigin(entity);
 
-        player.openMenu(decision.kind().menuProvider(container));
+        Component title = entity.hasCustomName() ? entity.getDisplayName() : decision.kind().defaultTitle();
+        player.openMenu(decision.kind().menuProvider(container, title));
         return InteractionResult.SUCCESS;
     }
 }

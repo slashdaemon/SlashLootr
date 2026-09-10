@@ -20,5 +20,6 @@ public class LootContainer extends LootContainerBase {
     public void stopOpen(ContainerUser user) {
         Container d = takeDelegate();
         if (d != null) d.stopOpen(user);
+        clearOrigin();
     }
 }

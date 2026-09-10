@@ -107,7 +107,7 @@ public final class CleanupHandler {
             BlockPos pos = BlockPos.of(packed);
             // An unloaded chunk tells us nothing — leave the entry for a later pass.
             if (!level.isLoaded(pos)) continue;
-            if (Handling.forBlock(level, pos, level.getBlockEntity(pos)).instanced()) continue;
+            if (Handling.stillPhysicallyPresent(level, pos, level.getBlockEntity(pos))) continue;
             store.forgetBlock(packed);
             removed++;
         }
@@ -133,7 +133,7 @@ public final class CleanupHandler {
                 skipped++;
                 continue;
             }
-            if (Handling.forBlock(level, pos, level.getBlockEntity(pos)).instanced()) continue;
+            if (Handling.stillPhysicallyPresent(level, pos, level.getBlockEntity(pos))) continue;
             store.forgetBlock(packed);
             removed++;
         }

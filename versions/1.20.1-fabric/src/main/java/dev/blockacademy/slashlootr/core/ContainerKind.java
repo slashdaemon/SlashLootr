@@ -41,8 +41,13 @@ public enum ContainerKind {
         return this == CHEST || this == BARREL || this == SHULKER || this == DOUBLE_CHEST;
     }
 
-    public MenuProvider menuProvider(Container container) {
-        Component title = Component.translatable(translationKey);
+    /** Generic vanilla title, for callers with no real container name to preserve (e.g. minecart hopper). */
+    public Component defaultTitle() {
+        return Component.translatable(translationKey);
+    }
+
+    /** @param title the real container's display name (custom name if renamed, default name otherwise) */
+    public MenuProvider menuProvider(Container container, Component title) {
         int slots = container.getContainerSize();
 
         // ShulkerBoxMenu hardcodes a 27-slot layout; a modded shulker of another size has to fall

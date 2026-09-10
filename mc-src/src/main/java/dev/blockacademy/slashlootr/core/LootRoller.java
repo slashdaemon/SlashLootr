@@ -2,6 +2,7 @@ package dev.blockacademy.slashlootr.core;
 
 import dev.blockacademy.slashlootr.SlashLootrCore;
 import dev.blockacademy.slashlootr.common.SeedDeriver;
+import dev.blockacademy.slashlootr.compat.Advancements;
 import dev.blockacademy.slashlootr.compat.Ids;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceKey;
@@ -62,6 +63,8 @@ public final class LootRoller {
                 .withParameter(LootContextParams.THIS_ENTITY, player)
                 .create(LootContextParamSets.CHEST);
         table.fill(container, params, SeedDeriver.derive(containerSeed, player.getUUID()));
+        // Matches vanilla unpackLootTable, which fires this once per player right after the roll.
+        Advancements.generateLoot(player, tableKey);
         return container;
     }
 }

@@ -185,6 +185,22 @@ public final class Handling {
         return d.instanced();
     }
 
+    // ------------------------------------------------------- prune presence
+
+    /**
+     * Structural-only presence check for {@code CleanupHandler}: is there still a container here that
+     * SlashLoot could have instanced, ignoring every config gate ({@code enabled}, blocklists)?
+     *
+     * <p>Deliberately narrower than {@link #forBlock}. A blocklist edit or a temporary {@code enabled:
+     * false} makes {@code forBlock} return {@code VANILLA} for a container that is still sitting there
+     * with a player's loot in it — pruning on that verdict would delete live per-player data for no
+     * reason but a config toggle. This only says yes once the container itself is actually gone:
+     * replaced, broken, or already unpacked (its {@code LootTable} tag cleared).
+     */
+    public static boolean stillPhysicallyPresent(Level level, BlockPos pos, BlockEntity be) {
+        return be instanceof RandomizableContainer rc && rc.getLootTable() != null;
+    }
+
     private static String entityId(Entity entity) {
         return BuiltInRegistries.ENTITY_TYPE.getKey(entity.getType()).toString();
     }

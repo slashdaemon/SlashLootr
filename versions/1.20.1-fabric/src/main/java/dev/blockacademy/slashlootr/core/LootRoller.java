@@ -2,6 +2,7 @@ package dev.blockacademy.slashlootr.core;
 
 import dev.blockacademy.slashlootr.SlashLootrMod;
 import dev.blockacademy.slashlootr.common.SeedDeriver;
+import net.minecraft.advancements.CriteriaTriggers;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
@@ -64,6 +65,8 @@ public final class LootRoller {
                 .withParameter(LootContextParams.THIS_ENTITY, player)
                 .create(LootContextParamSets.CHEST);
         table.fill(container, params, SeedDeriver.derive(containerSeed, player.getUUID()));
+        // Matches vanilla unpackLootTable, which fires this once per player right after the roll.
+        CriteriaTriggers.GENERATE_LOOT.trigger(player, tableId);
         return container;
     }
 }

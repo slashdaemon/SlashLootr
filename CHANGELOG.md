@@ -2,6 +2,33 @@
 
 All notable changes to SlashLootr. Dates are YYYY-MM-DD.
 
+## 0.3.1 — 2026-09-09
+
+**Vanilla containers stay vanilla containers, even locked ones.** Follow-up fixes from
+**TheArchictect**'s second round of testing on 0.3.0.
+
+- **Locked chests and barrels are locked again.** SlashLoot was checking the `Lock` NBT tag for
+  shulker boxes but not chests or barrels, so a locked chest or barrel opened for anyone regardless
+  of what was in their hand. All three now honor `Lock` the same way vanilla does.
+- **Shulker boxes obstructed by a block in front of them no longer open.** This was a second, separate
+  bug hiding behind the same line of code as the lock check above — fixed independently.
+- **Opening a container for the first time fires the `player_generates_container_loot` advancement
+  trigger**, matching vanilla. Datapacks and advancements keyed on it now work against SlashLoot
+  containers.
+- **Renamed containers keep their name.** A chest, barrel, or shulker box renamed on an anvil before
+  anyone loots it now shows that name in the personal-copy menu instead of the generic "Chest".
+- **Pruning no longer deletes live loot on a config change.** Adding a loot table to the blocklist, or
+  toggling `enabled` off temporarily, could make the background prune (or `/slashloot prune`) treat a
+  still-standing container as gone and drop its stored per-player loot. Pruning now only removes an
+  entry once the container itself is actually gone.
+- **Piglins get angry again, and open-container stats advance again.** SlashLoot's interaction handler
+  replaces vanilla's chest/barrel/shulker `use()` entirely, which was silently skipping
+  `PiglinAi.angerNearbyPiglins` and the `stat.openChest`/`openBarrel`/`openShulkerBox` stats. Both are
+  reproduced now.
+- **Personal container menus close when you walk away**, or if the real container is destroyed while
+  you're looking at your copy of it — matching vanilla's distance/validity behavior, which SlashLoot's
+  containers never implemented before this release.
+
 ## 0.3.0 — 2026-08-29
 
 **Built to sit inside somebody else's modpack.** Almost everything here is SlashLoot learning to do
